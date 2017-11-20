@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """utilities script copied from GSW-Python
 (https://github.com/TEOS-10/GSW-Python)
 """

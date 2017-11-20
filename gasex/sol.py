@@ -5,13 +5,16 @@ Created on Tue Nov 14 21:33:50 2017
 
 Functions for calculating dissolved gas solubility
 
-@author: dnicholson
+@author: d.nicholson
 """
 
 from __future__ import division
 import numpy as np
-from gsw import pt_from_CT,SP_from_SA
+from gsw import pt_from_CT,SP_from_SA,CT_from_pt,rho
 from ._utilities import match_args_return
+from gasex.phys import K0 as K0 
+from gasex.phys import vpress_sw
+
 
 
 __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
@@ -19,7 +22,91 @@ __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
            'Nesol','Arsol','Krsol','N2sol','N2Osol']
 
 
-UNITS = 'umol kg-1'
+
+@match_args_return
+def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
+    """
+    Description:
+    -----------
+    Wrapper function to calculate equilibrium solubility in [mol L-1] for gases 
+    with constant atmospheric mixing ratios.  Nobles gases, N2 and O2 are 
+    included.
+    
+    INPUT:  
+    -----------
+    REQUIRED:
+      SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
+      pt  =  potential temperature (ITS-90) referenced               [ deg C ]
+             to one standard atmosphere (0 dbar).
+      gas =  String abbreviation for gas (He,Ne,Ar,Kr,Xe,O2 or N2)
+    OPTIONAL:
+      patm = total atmospheric pressure in atm (default = 1.0 atm)
+      units = output units "M" or "umolkg" (default = M)
+      
+    OUTPUT:
+    -----------
+         soleq = gas eq. solubility including moist atmosphere             [M]
+     
+    AUTHOR: David Nicholson
+    -----------
+    """
+    if slp != 1.0:
+        vp_sw = vpress_sw(SP,pt)
+        scale_fact = (slp - vp_sw) / (1 - vp_sw)
+    else:
+        scale_fact = 1
+        
+    if gas == 'O2':
+        soleq = O2sol_SP_pt(SP,pt)
+    elif gas == 'He':
+        soleq = Hesol_SP_pt(SP,pt)
+    elif gas == 'Ne':
+        soleq = Nesol_SP_pt(SP,pt)
+    elif gas == 'Ar':
+        soleq = Arsol_SP_pt(SP,pt)
+    elif gas == 'Kr':
+        soleq = Krsol_SP_pt(SP,pt)
+    elif gas == 'Xe':
+        soleq = Xesol_SP_pt(SP,pt)
+    elif gas == 'N2':
+        soleq = N2sol_SP_pt(SP,pt)
+    else:
+        raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
+                         N2")
+    if units == "M":
+        SA = SP * 35.16504/35
+        CT = CT_from_pt(SA,pt)
+        dens = rho(SA,CT,0)
+        return scale_fact * soleq / dens
+    elif units == 'umolkg':
+        return scale_fact * soleq
+    else:
+        raise ValueError("units: units must be \'M\' or \'umolkg\'")
+        
+        
+@match_args_return
+def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
+    vp_sw = vpress_sw(SP,pt)
+    if gas in ['O2','He','Ne','Ar','Kr','Xe','N2']:
+        # solubility for 1 atm dry gas (K0)
+        K0 = eq_SP_pt(SP,pt,gas=gas) / (air_mol_fract(gas) * (1-vp_sw))
+    elif gas == 'N2O':
+        K0 = N2Osol_SP_pt(SP,pt)
+    elif gas == 'CO2':
+        K0 = CO2sol_SP_pt(SP,pt)
+    else:
+        raise ValueError(gas + " is not supported. Must be 'O2','He','Ne',\
+                         'Ar','Kr','Xe','N2','N2O' or 'CO2'")
+    if units == "M":
+        return p_dry * K0
+    elif units == 'umolkg':
+        SA = SP * 35.16504/35
+        CT = CT_from_pt(SA,pt)
+        dens = rho(SA,CT,0)
+        return dens * p_dry * K0
+    else:
+        raise ValueError("units: units must be \'M\' or \'umolkg\'")
+        
     
 @match_args_return
 def O2sol_SP_pt(SP,pt):
@@ -48,16 +135,11 @@ def O2sol_SP_pt(SP,pt):
       pt  =  potential temperature (ITS-90) referenced               [ deg C ]
              to one standard atmosphere (0 dbar).
     
-      SP & pt need to have the same dimensions.
-    
      OUTPUT:
       O2sol = solubility of oxygen in micro-moles per kg           [ umol/kg ] 
      
      AUTHOR:  Roberta Hamme, Paul Barker and Trevor McDougall
-                                                          [ help@teos-10.org ]
-    
-     VERSION NUMBER: 3.05 (27th January 2015)
-    
+
      REFERENCES:
       IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of 
        seawater - 2010: Calculation and use of thermodynamic properties.  
@@ -88,7 +170,7 @@ def O2sol_SP_pt(SP,pt):
 
     pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
               # the 1968 International Practical Temperature Scale IPTS-68.
-    y = np.log((298.15 - pt68)/(273.15 + pt68))
+    y = np.log((25+K0 - pt68)/(K0 + pt68))
 
 # The coefficents below are from the second column of Table 1 of Garcia and
 # Gordon (1992)
@@ -170,7 +252,7 @@ def Hesol_SP_pt(SP,pt):
 
     pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
                   # the 1968 International Practical Temperature Scale IPTS-68.
-    y = pt68 + 273.15
+    y = pt68 + K0
     y_100 = y * 1e-2
     
     # The coefficents below are from Table 3 of Weiss (1971)
@@ -246,8 +328,9 @@ def Nesol_SP_pt(SP,pt):
     # Note that salinity argument is Practical Salinity, this is
     # beacuse the major ionic components of seawater related to Cl  
     # are what affect the solubility of non-electrolytes in seawater.   
-    
-    y = np.log((298.15 - pt)/(273.15 + pt))  
+    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+              # the 1968 International Practical Temperature Scale IPTS-68.
+    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
@@ -321,8 +404,9 @@ def Arsol_SP_pt(SP,pt):
     # Note that salinity argument is Practical Salinity, this is
     # beacuse the major ionic components of seawater related to Cl  
     # are what affect the solubility of non-electrolytes in seawater.   
-    
-    y = np.log((298.15 - pt)/(273.15 + pt))  
+    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+              # the 1968 International Practical Temperature Scale IPTS-68.
+    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
@@ -375,7 +459,6 @@ def Krsol_SP_pt(SP,pt):
      AUTHOR:  Roberta Hamme, Paul Barker and Trevor McDougall
                                                           [ help@teos-10.org ]
     
-     VERSION NUMBER: 3.05 (27th January 2015)
     
      REFERENCES:
       IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of 
@@ -396,7 +479,7 @@ def Krsol_SP_pt(SP,pt):
 
     pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
                   # the 1968 International Practical Temperature Scale IPTS-68.
-    y = pt68 + 273.15
+    y = pt68 + K0
     y_100 = y * 1e-2
 
     # Table 2 (Weiss and Kyser, 1978)
@@ -420,6 +503,70 @@ def Krsol(SA,CT,p,long,lat):
     SP = SP_from_SA(SA,p,long,lat)
     pt = pt_from_CT(SA,CT)
     return Krsol_SP_pt(SP,pt)
+
+
+@match_args_return
+def Xesol_SP_pt(SP,pt):
+    """
+     Xesol_SP_pt                              solubility of Xe in seawater
+    ==========================================================================
+    
+     USAGE:  
+      Xesol = sol.Xesol_SP_pt(SP,pt)
+    
+     DESCRIPTION:
+      Calculates the xenon (Xe) concentration expected at equilibrium with  
+      air at an Absolute Pressure of 101325 Pa (sea pressure of 0 dbar) 
+      including saturated water vapor.  
+    
+    
+     INPUT:  
+      SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
+      pt  =  potential temperature (ITS-90) referenced               [ deg C ]
+             to one standard atmosphere (0 dbar).
+    
+      SP & pt need to have the same dimensions.
+    
+     OUTPUT:
+      Xesol = solubility of xenon at 1 atm moist atmosphere        [ umol/kg ] 
+     
+     AUTHOR:  D. Nicholson  Adapted from MATLAB Xesol.m by R. Hamme
+
+    
+     REFERENCES:
+         R. Hamme fit to data of D. Wood and R. Caputi (1966) "Solubilities of 
+         Kr and Xe in fresh and sea water" U.S. Naval Radiological Defense 
+         Laboratory, Technical Report USNRDL-TR-988,San Francisco, CA, pp. 14.
+    
+    ==========================================================================
+    """
+    x = SP        # Note that salinity argument is Practical Salinity, this is
+             # beacuse the major ionic components of seawater related to Cl  
+          # are what affect the solubility of non-electrolytes in seawater.   
+    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+              # the 1968 International Practical Temperature Scale IPTS-68.
+    y = np.log((25+K0 - pt68)/(K0 + pt68))  
+    # pt is the temperature in degress C on the ITS-90 scale
+
+
+    #  from fit procedure of Hamme and Emerson 2004 to Wood and Caputi data
+    a = [-7.48588, 5.08763, 4.22078]
+    b = [-8.17791e-3, -1.20172e-2]
+    
+    Xesol = np.exp(a[0] + y * (a[1] + y * a[2]) + x * (b[0] + y *b[1]))
+    
+    return Xesol
+
+@match_args_return
+def Xesol(SA,CT,p,long,lat):
+    """
+     Xe      Solubility of Xe in seawater from absolute salinity and cons temp
+    ==========================================================================
+    """
+    SP = SP_from_SA(SA,p,long,lat)
+    pt = pt_from_CT(SA,CT)
+    return Xesol_SP_pt(SP,pt)
+
 
 @match_args_return
 def N2sol_SP_pt(SP,pt):
@@ -474,7 +621,10 @@ def N2sol_SP_pt(SP,pt):
     # beacuse the major ionic components of seawater related to Cl  
     # are what affect the solubility of non-electrolytes in seawater.   
     
-    y = np.log((298.15 - pt)/(273.15 + pt))  
+    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+              # the 1968 International Practical Temperature Scale IPTS-68.
+              
+    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
@@ -550,31 +700,34 @@ def N2Osol_SP_pt(SP,pt):
 
     pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
                   # the 1968 International Practical Temperature Scale IPTS-68.
-    y = pt68 + 273.15
+    y = pt68 + K0
     y_100 = y * 1e-2
     
     # The coefficents below are from Table 2 of Weiss and Price (1980)
     # These coefficients are for mol L-1 atm-1
     
-    a = [-165.8806, 222.8743, 92.0792, -1.48425]
-    b = [-0.056235, 0.031619, -0.0048472]
+    
+    a = [-62.7062, 97.3066, 24.1406]
+    b = [-0.058420, 0.033193, -0.0051313]
+    
+    #a = [-165.8806, 222.8743, 92.0792, -1.48425]
+    #b = [-0.056235, 0.031619, -0.0048472]
     
     # These coefficents below are from Table 2 of Weiss and Price (1980)
     # These coefficients are for mol kg-1 atm-1
-    a = [-168.2459, 226.0894, 93.2817, -1.48693]
-    b = [-0.060361 + 0.033765, -0.0051862]
+    # a = [-168.2459, 226.0894, 93.2817, -1.48693]
+    # b = [-0.060361 + 0.033765, -0.0051862]
     
     # Moist air correction at 1 atm.
     # fitted the vapor pressure of water as given by Goff and Gratch (1946), 
     # and the vapor pressure lowering by sea salt as given by Robinson (1954), 
     # to a polynomial in temperature and salinity:
     
-    m = [24.4543, 67.4509, 4.8489, 0.000544]
-    ph2odP = np.exp(m[0] - m[1]*100/y - m[2] * np.log(y_100) - m[3] * x) 
+    #m = [24.4543, 67.4509, 4.8489, 0.000544]
+    #ph2odP = np.exp(m[0] - m[1]*100/y - m[2] * np.log(y_100) - m[3] * x) 
     
-    N2Osol = (np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) + a[3] * \
-                    y_100**2 + x * (b[0] + y_100 * (b[1] + b[2] * y_100)))) / \
-                     (1-ph2odP)
+    N2Osol = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) + x * \
+                     (b[0] + y_100 * (b[1] + b[2] * y_100)))
     return N2Osol
 
 @match_args_return
@@ -599,10 +752,8 @@ def CO2sol_SP_pt(SP,pt):
     
      DESCRIPTION:
       Calculates the carbon dioxide, CO2, concentration expected at equilibrium 
-      with air at an Absolute Pressure of 101325 Pa (sea pressure of 0 dbar) 
-      including saturated water vapor.  This function uses the solubility 
-      coefficients derived from the data of Weiss (1974) and refit in Weiss
-      and Price (1980).
+      with a pure CO2 pressure of 101325 Pa (1.0 atm) This function uses the 
+      solubility coefficients derived from the data of Weiss (1974) 
     
     
      INPUT:  
@@ -613,7 +764,7 @@ def CO2sol_SP_pt(SP,pt):
       SP & pt need to have the same dimensions.
     
      OUTPUT:
-      CO2sol = solubility of carbon dioxide at 1 atm moist   [ mol kg-1 atm-1 ] 
+      CO2sol = solubility of carbon dioxide at 1 atm dry     [ mol L-1 atm-1 ] 
      
      AUTHOR:  David Nicholson
                                                         [ dnicholson@whoi.edu ]
@@ -635,15 +786,18 @@ def CO2sol_SP_pt(SP,pt):
 
     pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
                   # the 1968 International Practical Temperature Scale IPTS-68.
-    y = pt68 + 273.15
+    y = pt68 + K0
     y_100 = y * 1e-2
 
     # Table 6 (Weiss and Price, 1980)
-    a = [-162.8301, 218.2968, 90.9241, -1.47696]
-    b = [0.025695, -0.025225, 0.0049867]
+    #a = [-162.8301, 218.2968, 90.9241, -1.47696]
+    #b = [0.025695, -0.025225, 0.0049867]
+    # Table 1 (Weiss 1974, Marine Chem)
+    a = [-58.0931, 90.5069, 22.2940]
+    b = [0.027766, -0.025888, 0.0050578]
     
-    CO2sol = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) + a[3] * \
-                      y_100**2 + x * (b[0] + b[1] * y_100 + b[2] * y_100**2))
+    CO2sol = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
+                    (b[0] + b[1] * y_100 + b[2] * y_100**2))
     return CO2sol
 
 @match_args_return
@@ -655,3 +809,14 @@ def CO2sol(SA,CT,p,long,lat):
     SP = SP_from_SA(SA,p,long,lat)
     pt = pt_from_CT(SA,CT)
     return CO2sol_SP_pt(SP,pt)
+
+
+def air_mol_fract(gas=None):
+    frac_dict = {'O2':np.array([0.209790]), \
+                 'He':np.array([5.24e-6]), \
+                 'Ne':np.array([0.00001818]), \
+                 'Ar':np.array([0.009332]), \
+                 'Kr':np.array([0.00000114]), \
+                 'Xe':np.array([8.7e-8]), \
+                 'N2':np.array([0.780848]) }
+    return frac_dict[gas]

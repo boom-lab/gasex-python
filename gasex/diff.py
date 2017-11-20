@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 % Diffusion coeff and Schmidt number for gases in fresh/sea water
 %=========================================================================
@@ -49,8 +51,16 @@
 from __future__ import division
 import numpy as np
 from gsw import CT_from_pt,rho
+from ._utilities import match_args_return
+from gasex.phys import R as R 
+from gasex.phys import visc as visc
 
-def diff(SP,pt,gas):
+
+
+GAS_LIST = ['He','Ne','Ar','Kr','Xe','N2','O2','CH4','N2','CO2']
+
+@match_args_return
+def diff(SP,pt,*,gas=None):
     
     """
     DESCRIPTION
@@ -67,8 +77,9 @@ def diff(SP,pt,gas):
       D = diffusion coefficient     [m^2 s-1]
 
     """
-    
-    R = 8.314510
+    if gas not in GAS_LIST:
+        raise ValueError("gas: must be one of ", GAS_LIST)
+        
     AEa_dict = {'O2': [4.286e-6, 18700],\
            'He': [0.8180e-6, 11700],\
            'Ne': [1.6080e-6, 14840],\
@@ -92,13 +103,18 @@ def diff(SP,pt,gas):
     return D
 
 
-
-def schmidt(SP,pt,gas):
-    Sc = visc(SP,pt) / diff(SP,pt,gas) 
+@match_args_return
+def schmidt(SP,pt,*,gas=None):
+    if gas not in GAS_LIST:
+        raise ValueError("gas: must be one of ", GAS_LIST)
+        
+    Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 
     return Sc
 
+"""
+@match_args_return
 def visc(SP,pt):
-    """
+    
     Calculated the Kinematic Viscosity of Seawater as a function of salinity 
     Temperature
     
@@ -129,7 +145,7 @@ def visc(SP,pt):
     % DESCRIPTION:
     %    Calculates kinematic viscosity of sea-water. 
     %    based on Dan Kelley's fit to Knauss's TABLE II-8
-    """
+    
     
 
     SA = SP * 35.16504/35
@@ -137,3 +153,4 @@ def visc(SP,pt):
     dens = rho(SA,CT,0)
     visc = 1e-4 * (17.91 - 0.5381 * pt + 0.00694 * pt**2 + 0.02305 * SP) / dens
     return visc
+"""
