@@ -9,14 +9,14 @@ Common physical constants and properties for gas functions
 """
 from __future__ import division
 import numpy as np
-from gsw import rho
+from gsw import rho, CT_from_pt
 from ._utilities import match_args_return
 
 # 0 Celsius in Kelvin
 K0 = 273.15
 
 # Gas Constant in J / mol K
-R = 8.314459848
+R = 8.3144598
 
 # 1 atm in Pa
 atm2pa = 101325.0

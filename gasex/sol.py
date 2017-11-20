@@ -13,7 +13,7 @@ import numpy as np
 from gsw import pt_from_CT,SP_from_SA,CT_from_pt,rho
 from ._utilities import match_args_return
 from gasex.phys import K0 as K0 
-from gasex.phys import vpress_sw
+from gasex.phys import vpress_sw, R
 
 
 
@@ -94,9 +94,15 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
         K0 = N2Osol_SP_pt(SP,pt)
     elif gas == 'CO2':
         K0 = CO2sol_SP_pt(SP,pt)
+    elif gas == 'CH4':
+        K0 = CH4sol_SP_pt(SP,pt)
+    elif gas == 'CO':
+        K0 = COsol_SP_pt(SP,pt)
+    elif gas == 'H2':
+        K0 = H2sol_SP_pt(SP,pt)
     else:
         raise ValueError(gas + " is not supported. Must be 'O2','He','Ne',\
-                         'Ar','Kr','Xe','N2','N2O' or 'CO2'")
+                         'Ar','Kr','Xe','N2','CO2',N2O','CH4','CO' or 'H2'")
     if units == "M":
         return p_dry * K0
     elif units == 'umolkg':
@@ -810,13 +816,266 @@ def CO2sol(SA,CT,p,long,lat):
     pt = pt_from_CT(SA,CT)
     return CO2sol_SP_pt(SP,pt)
 
+@match_args_return
+def CH4sol_SP_pt(SP,pt):
+    """
+     CH4sol_SP_pt            solubility of CH4 in seawater  [mol L-1 atm-1]
+    ==========================================================================
+    
+     USAGE:  
+      import gas.sol as sol
+      CH4sol = sol.CH4sol_SP_pt(SP,pt)
+    
+     DESCRIPTION:
+      Calculates methane solubility (K0) in units of mol L-1 atm-1. Equivalent
+      to the dissloved concentration in equilibrium with a pure CH4 pressure 
+      of 101325 Pa (1.0 atm) This function uses the solubility coefficients 
+      from Weisenburg and Guinasso fit to data from Yamamoto et al. 1976. 
+    
+    
+     INPUT:  
+      SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
+      pt  =  potential temperature (ITS-90) referenced               [ deg C ]
+             to one standard atmosphere (0 dbar).
+    
+      SP & pt need to have the same dimensions.
+    
+     OUTPUT:
+      CH4sol = solubility of methane                          [ mol L-1 atm-1 ] 
+     
+     AUTHOR:  David Nicholson
+                                                        [ dnicholson@whoi.edu ]
+    
+    
+     REFERENCES:
+      Wiesenburg, D. A., and N. L. Guinasso (1979), Equilibrium solubilities of
+          methane, carbon monoxide, and hydrogen in water and sea water,  
+          J.Chem. Eng. Data, 24(4), 356?360, doi:10.1021/je60083a006.
+
+      Yamamoto, S., J. B. Alcauskas, and T. E. Crozier (1976), Solubility of 
+          methane in distilled water and seawater, J. Chem. Eng. Data, 21(1), 
+          78?80, doi:10.1021/je60068a029.
+    
+    ==========================================================================
+    """
+    x = SP        # Note that salinity argument is Practical Salinity, this is
+             # beacuse the major ionic components of seawater related to Cl  
+          # are what affect the solubility of non-electrolytes in seawater.   
+
+    pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
+                  # the 1968 International Practical Temperature Scale IPTS-68.
+    y = pt68 + K0
+    y_100 = y * 1e-2
+
+    # Table 1 in Weisenburg and Guinasso 1979
+    a = [-68.8862, 101.4956, 28.7314]
+    b = [-0.076146, 0.043970, -0.0068672]
+    
+    # Bunsen solubility in cc gas @STP / mL H2O atm-1
+    CH4_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
+                    (b[0] + b[1] * y_100 + b[2] * y_100**2))
+    # Divide by gas virial volume to get mol L-1 atm-1
+    CH4sol = CH4_beta / mol_vol(gas='CH4')
+    return CH4sol
+
+@match_args_return
+def CH4sol(SA,CT,p,long,lat):
+    """
+     CH4    Solubility of CH4 in seawater from absolute salinity and cons temp
+    ==========================================================================
+    """
+    SP = SP_from_SA(SA,p,long,lat)
+    pt = pt_from_CT(SA,CT)
+    return CH4sol_SP_pt(SP,pt)
+
+@match_args_return
+def COsol_SP_pt(SP,pt):
+    """
+     COsol_SP_pt            solubility of CO in seawater  [mol L-1 atm-1]
+    ==========================================================================
+    
+     USAGE:  
+      import gas.sol as sol
+      COsol = sol.COsol_SP_pt(SP,pt)
+    
+     DESCRIPTION:
+      Calculates carbon monoxide solubility (K0) in units of mol L-1 atm-1. 
+      Equivalent to the dissloved concentration in equilibrium with a pure CO 
+      pressure of 101325 Pa (1.0 atm) This function uses the solubility 
+      coefficients from Weisenburg and Guinasso fit to data from Douglas (1967) 
+      and Winkler (1906).     
+    
+     INPUT:  
+      SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
+      pt  =  potential temperature (ITS-90) referenced               [ deg C ]
+             to one standard atmosphere (0 dbar).
+    
+      SP & pt need to have the same dimensions.
+    
+     OUTPUT:
+      COsol = solubility of carbon monoxide                   [ mol L-1 atm-1 ] 
+     
+     AUTHOR:  David Nicholson
+                                                        [ dnicholson@whoi.edu ]
+    
+    
+     REFERENCES:
+      Wiesenburg, D. A., and N. L. Guinasso (1979), Equilibrium solubilities of
+          methane, carbon monoxide, and hydrogen in water and sea water,  
+          J.Chem. Eng. Data, 24(4), 356?360, doi:10.1021/je60083a006.
+
+      Douglas, E., J. Phys. Chem., 71, 1931 (1967).
+      
+      Winkler, I.W., 2.Phys. Chem. Abt. A, 55, 344 (1906)
+       
+    ==========================================================================
+    """
+    x = SP        # Note that salinity argument is Practical Salinity, this is
+             # beacuse the major ionic components of seawater related to Cl  
+          # are what affect the solubility of non-electrolytes in seawater.   
+
+    pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
+                  # the 1968 International Practical Temperature Scale IPTS-68.
+    y = pt68 + K0
+    y_100 = y * 1e-2
+
+    # Table 1 in Weisenburg and Guinasso 1979
+    a = [-47.6148, 69.5068, 18.7397]
+    b = [0.045657, -0.040721, 0.0079700]
+    
+    # Bunsen solubility in cc gas @STP / mL H2O atm-1
+    CO_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
+                    (b[0] + b[1] * y_100 + b[2] * y_100**2))
+    # Divide by gas virial volume to get mol L-1 atm-1
+    COsol = CO_beta / mol_vol(gas='CO')
+    return COsol
+
+@match_args_return
+def COsol(SA,CT,p,long,lat):
+    """
+     CO    Solubility of CO in seawater from absolute salinity and cons temp
+    ==========================================================================
+    """
+    SP = SP_from_SA(SA,p,long,lat)
+    pt = pt_from_CT(SA,CT)
+    return COsol_SP_pt(SP,pt)
+
+@match_args_return
+def H2sol_SP_pt(SP,pt):
+    """
+     H2sol_SP_pt            solubility of H2 in seawater  [mol L-1 atm-1]
+    ==========================================================================
+    
+     USAGE:  
+      import gas.sol as sol
+      COsol = sol.COsol_SP_pt(SP,pt)
+    
+     DESCRIPTION:
+      Calculates hydrogen gas solubility (K0) in units of mol L-1 atm-1. 
+      Equivalent to the dissloved concentration in equilibrium with a pure H2 
+      pressure of 101325 Pa (1.0 atm) This function uses the solubility 
+      coefficients from Weisenburg and Guinasso fit to data from Douglas (1967) 
+      and Winkler (1906).     
+    
+     INPUT:  
+      SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
+      pt  =  potential temperature (ITS-90) referenced               [ deg C ]
+             to one standard atmosphere (0 dbar).
+    
+      SP & pt need to have the same dimensions.
+    
+     OUTPUT:
+      H2sol = solubility of hydrogen gas                      [ mol L-1 atm-1 ] 
+     
+     AUTHOR:  David Nicholson
+                                                        [ dnicholson@whoi.edu ]
+    
+    
+     REFERENCES:
+      Wiesenburg, D. A., and N. L. Guinasso (1979), Equilibrium solubilities of
+          methane, carbon monoxide, and hydrogen in water and sea water,  
+          J.Chem. Eng. Data, 24(4), 356?360, doi:10.1021/je60083a006.
+
+      Crozier, T. E., Yamamoto, S.,J. Chem. Eng. Data, 19, 242 (1974)
+      
+      Gordon, L. I., Cohen, Y., Standley, D. R., Deep-sea Res., 24, 937 (1977)
+       
+    ==========================================================================
+    """
+    x = SP        # Note that salinity argument is Practical Salinity, this is
+             # beacuse the major ionic components of seawater related to Cl  
+          # are what affect the solubility of non-electrolytes in seawater.   
+
+    pt68 = pt * 1.00024 # pt68 is the potential temperature in degress C on 
+                  # the 1968 International Practical Temperature Scale IPTS-68.
+    y = pt68 + K0
+    y_100 = y * 1e-2
+
+    # Table 1 in Weisenburg and Guinasso 1979
+    a = [-47.8948, 65.0368, 20.1709]
+    b = [-0.082225, 0.049564, -0.0078689]
+    
+    # Bunsen solubility in cc gas @STP / mL H2O atm-1
+    H2_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
+                    (b[0] + b[1] * y_100 + b[2] * y_100**2))
+    # Divide by gas virial volume to get mol L-1 atm-1
+    H2sol = H2_beta / mol_vol(gas='H2')
+    return H2sol
+
+@match_args_return
+def H2sol(SA,CT,p,long,lat):
+    """
+     H2    Solubility of H2 in seawater from absolute salinity and cons temp
+    ==========================================================================
+    """
+    SP = SP_from_SA(SA,p,long,lat)
+    pt = pt_from_CT(SA,CT)
+    return H2sol_SP_pt(SP,pt)
+
+
 
 def air_mol_fract(gas=None):
-    frac_dict = {'O2':np.array([0.209790]), \
+    if gas in ['O2','He','Ne','Ar','Kr','Xe','N2']:
+        frac_dict = {'O2':np.array([0.209790]), \
                  'He':np.array([5.24e-6]), \
                  'Ne':np.array([0.00001818]), \
                  'Ar':np.array([0.009332]), \
                  'Kr':np.array([0.00000114]), \
                  'Xe':np.array([8.7e-8]), \
                  'N2':np.array([0.780848]) }
+    else:
+        raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
+                         N2")
     return frac_dict[gas]
+
+def mol_vol(gas=None):
+    vol_dict = {'He':np.array([22.4263]), \
+                 'Ne':np.array([22.4241]), \
+                 'Ar':np.array([22.3924]), \
+                 'Kr':np.array([22.3518]), \
+                 'Xe':np.array([22.2582]), \
+                 'O2':np.array([22.3922]), \
+                 'N2':np.array([22.4045]), \
+                 'N2O':np.array([22.243]), \
+                 'CO2':np.array([0.99498*22.414]), \
+                 'CH4':np.array([22.360]), \
+                 'H2':np.array([22.428]) }
+    return vol_dict[gas]
+
+def mol_vol_calc(gas=None,t=298.15):
+    """
+    http://www.kayelaby.npl.co.uk/chemistry/3_5/3_5.html
+    """
+    B_dict = {'CO': [202.6,154.2,94.2]}
+    bcoeff = B_dict[gas]
+    B = bcoeff[0] - bcoeff[1] * np.exp(bcoeff[2]*t / 298.15)
+    
+    # quadratic coefficients
+    a = 1 / (R * 298.15)
+    b = -1
+    c = -B
+    print (B)
+    print(a)
+    V = b + np.sqrt(1 - 4 * a * c) / 2 * a
+    return V
+    
