@@ -50,14 +50,14 @@
 """
 from __future__ import division
 import numpy as np
-from gsw import CT_from_pt,rho
 from ._utilities import match_args_return
 from gasex.phys import R as R 
 from gasex.phys import visc as visc
 
 
-
-GAS_LIST = ['He','Ne','Ar','Kr','Xe','N2','O2','CH4','N2','CO2']
+# Currently supported gases
+# TODO: find N2O, CO diffusivities
+GAS_LIST = ('HE','NE','AR','KR','XE','N2','O2','CH4','N2','CO2')
 
 @match_args_return
 def diff(SP,pt,*,gas=None):
@@ -77,21 +77,22 @@ def diff(SP,pt,*,gas=None):
       D = diffusion coefficient     [m^2 s-1]
 
     """
-    if gas not in GAS_LIST:
+    g_up = gas.upper()
+    if g_up not in GAS_LIST:
         raise ValueError("gas: must be one of ", GAS_LIST)
         
-    AEa_dict = {'O2': [4.286e-6, 18700],\
-           'He': [0.8180e-6, 11700],\
-           'Ne': [1.6080e-6, 14840],\
-           'Ar': [2.227e-6, 16680],\
-           'Kr': [6.3930e-6, 20200],\
-           'Xe': [9.0070e-6, 21610],\
-           'N2': [3.4120e-6, 18500],\
-           'CH4':[3.0470e-6, 18360],\
-           'CO2':[5.0190e-6, 19510],\
-           'H2': [3.3380e-6, 16060]}
+    AEa_dict = {'O2': (4.286e-6, 18700),\
+           'HE': (0.8180e-6, 11700),\
+           'NE': (1.6080e-6, 14840),\
+           'AR': (2.227e-6, 16680),\
+           'KR': (6.3930e-6, 20200),\
+           'XE': (9.0070e-6, 21610),\
+           'N2': (3.4120e-6, 18500),\
+           'CH4':(3.0470e-6, 18360),\
+           'CO2':(5.0190e-6, 19510),\
+           'H2': (3.3380e-6, 16060)}
            
-    if gas in AEa_dict.keys():
+    if g_up in AEa_dict.keys():
         #freshwater diffusivity
         AEa = AEa_dict[gas]
         D0 = AEa[0] * np.exp(-AEa[1] / (R * (pt+273.15)))
@@ -105,7 +106,8 @@ def diff(SP,pt,*,gas=None):
 
 @match_args_return
 def schmidt(SP,pt,*,gas=None):
-    if gas not in GAS_LIST:
+    g_up = gas.upper
+    if g_up not in GAS_LIST:
         raise ValueError("gas: must be one of ", GAS_LIST)
         
     Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 

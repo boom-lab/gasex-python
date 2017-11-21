@@ -52,9 +52,9 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
     """
     if slp != 1.0:
         vp_sw = vpress_sw(SP,pt)
-        scale_fact = (slp - vp_sw) / (1 - vp_sw)
+        p_corr = (slp - vp_sw) / (1 - vp_sw)
     else:
-        scale_fact = 1
+         p_corr = 1
         
     if gas == 'O2':
         soleq = O2sol_SP_pt(SP,pt)
@@ -73,23 +73,29 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
     else:
         raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
                          N2")
-    if units == "M":
-        SA = SP * 35.16504/35
-        CT = CT_from_pt(SA,pt)
-        dens = rho(SA,CT,0)
-        return scale_fact * soleq / dens
+    if units not in ("M","uM","umolkg"):
+        raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
+    SA = SP * 35.16504/35
+    CT = CT_from_pt(SA,pt)
+    dens = rho(SA,CT,0)    
+    if units == "M":        
+        eq =  p_corr * dens * soleq / 1e9
+    elif units =="uM":
+        eq =  p_corr * dens * soleq / 1e3
     elif units == 'umolkg':
-        return scale_fact * soleq
-    else:
-        raise ValueError("units: units must be \'M\' or \'umolkg\'")
+        eq =  p_corr * soleq
+    return eq
+        
+        
         
         
 @match_args_return
 def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
+    g_up = gas.upper()
     vp_sw = vpress_sw(SP,pt)
-    if gas in ['O2','He','Ne','Ar','Kr','Xe','N2']:
+    if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
         # solubility for 1 atm dry gas (K0)
-        K0 = eq_SP_pt(SP,pt,gas=gas) / (air_mol_fract(gas) * (1-vp_sw))
+        K0 = eq_SP_pt(SP,pt,gas=gas,units="M") / (air_mol_fract(gas) * (1-vp_sw))
     elif gas == 'N2O':
         K0 = N2Osol_SP_pt(SP,pt)
     elif gas == 'CO2':
@@ -180,8 +186,8 @@ def O2sol_SP_pt(SP,pt):
 
 # The coefficents below are from the second column of Table 1 of Garcia and
 # Gordon (1992)
-    a = [5.80871,3.20291,4.17887,5.10006,-9.86643e-2,3.80369] 
-    b = [-7.01577e-3,-7.70028e-3,-1.13864e-2,-9.51519e-3]
+    a = (5.80871,3.20291,4.17887,5.10006,-9.86643e-2,3.80369) 
+    b = (-7.01577e-3,-7.70028e-3,-1.13864e-2,-9.51519e-3)
     c = -2.75915e-7
 
 
@@ -262,13 +268,13 @@ def Hesol_SP_pt(SP,pt):
     y_100 = y * 1e-2
     
     # The coefficents below are from Table 3 of Weiss (1971)
-    a = [-167.2178, 216.3442, 139.2032, -22.6202]
-    b = [-0.044781, 0.023541, -0.0034266]
+    a = (-167.2178, 216.3442, 139.2032, -22.6202)
+    b = (-0.044781, 0.023541, -0.0034266)
     
     Hesol_mL = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) + a[3] * \
                       y_100 + x * (b[0] + y_100 * (b[1] + b[2] * y_100)))
     
-    Hesol = Hesol_mL * 4.455817671505537e1
+    Hesol = 1000* Hesol_mL / mol_vol(gas="He")
     # mL/kg to umol/kg for He (1/22.44257e-3) 
     #Molar volume at STP (Dymond and Smith, 1980).
     return Hesol
@@ -340,11 +346,11 @@ def Nesol_SP_pt(SP,pt):
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
-    a =  [2.18156, 1.29108, 2.12504]
-    b = [-5.94737e-3, -5.13896e-3]
+    a =  (2.18156, 1.29108, 2.12504)
+    b = (-5.94737e-3, -5.13896e-3)
     
     # umol kg-1 for consistency with other gases
-    Nesol = 1e3 * np.exp(a[0] + y * (a[1] + a[2] * y) + x * (b[0] + b[1] * y))
+    Nesol = np.exp(a[0] + y * (a[1] + a[2] * y) + x * (b[0] + b[1] * y)) / 1e3
     return Nesol
 
 @match_args_return
@@ -416,8 +422,8 @@ def Arsol_SP_pt(SP,pt):
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
-    a =  [2.79150, 3.17609, 4.13116, 4.90379]
-    b = [-6.96233e-3, -7.66670e-3, -1.16888e-2]
+    a =  (2.79150, 3.17609, 4.13116, 4.90379)
+    b = (-6.96233e-3, -7.66670e-3, -1.16888e-2)
     
     Arsol = np.exp(a[0] + y * (a[1] + y * (a[2] + a[3] * y)) + x * \
                    (b[0] + y *(b[1] + b[2] *y )))
@@ -489,8 +495,8 @@ def Krsol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # Table 2 (Weiss and Kyser, 1978)
-    a = [-112.6840, 153.5817, 74.4690, -10.0189]
-    b = [-0.011213, -0.001844, 0.0011201]
+    a = (-112.6840, 153.5817, 74.4690, -10.0189)
+    b = (-0.011213, -0.001844, 0.0011201)
     
     Krsol_mL = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) + a[3] * \
                       y_100 + x * (b[0] + y_100 * (b[1] + b[2] * y_100)))
@@ -556,8 +562,8 @@ def Xesol_SP_pt(SP,pt):
 
 
     #  from fit procedure of Hamme and Emerson 2004 to Wood and Caputi data
-    a = [-7.48588, 5.08763, 4.22078]
-    b = [-8.17791e-3, -1.20172e-2]
+    a = (-7.48588, 5.08763, 4.22078)
+    b = (-8.17791e-3, -1.20172e-2)
     
     Xesol = np.exp(a[0] + y * (a[1] + y * a[2]) + x * (b[0] + y *b[1]))
     
@@ -634,8 +640,8 @@ def N2sol_SP_pt(SP,pt):
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
-    a = [6.42931, 2.92704, 4.32531, 4.69149]
-    b = [-7.44129e-3, -8.02566e-3, -1.46775e-2]
+    a = (6.42931, 2.92704, 4.32531, 4.69149)
+    b = (-7.44129e-3, -8.02566e-3, -1.46775e-2)
     
     N2sol = np.exp(a[0] + y * (a[1] + y * (a[2] + a[3] * y)) + x * \
                    (b[0] + y *(b[1] + b[2] *y )))
@@ -713,8 +719,8 @@ def N2Osol_SP_pt(SP,pt):
     # These coefficients are for mol L-1 atm-1
     
     
-    a = [-62.7062, 97.3066, 24.1406]
-    b = [-0.058420, 0.033193, -0.0051313]
+    a = (-62.7062, 97.3066, 24.1406)
+    b = (-0.058420, 0.033193, -0.0051313)
     
     #a = [-165.8806, 222.8743, 92.0792, -1.48425]
     #b = [-0.056235, 0.031619, -0.0048472]
@@ -799,8 +805,8 @@ def CO2sol_SP_pt(SP,pt):
     #a = [-162.8301, 218.2968, 90.9241, -1.47696]
     #b = [0.025695, -0.025225, 0.0049867]
     # Table 1 (Weiss 1974, Marine Chem)
-    a = [-58.0931, 90.5069, 22.2940]
-    b = [0.027766, -0.025888, 0.0050578]
+    a = (-58.0931, 90.5069, 22.2940)
+    b = (0.027766, -0.025888, 0.0050578)
     
     CO2sol = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
                     (b[0] + b[1] * y_100 + b[2] * y_100**2))
@@ -868,8 +874,8 @@ def CH4sol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # Table 1 in Weisenburg and Guinasso 1979
-    a = [-68.8862, 101.4956, 28.7314]
-    b = [-0.076146, 0.043970, -0.0068672]
+    a = (-68.8862, 101.4956, 28.7314)
+    b = (-0.076146, 0.043970, -0.0068672)
     
     # Bunsen solubility in cc gas @STP / mL H2O atm-1
     CH4_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
@@ -940,8 +946,8 @@ def COsol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # Table 1 in Weisenburg and Guinasso 1979
-    a = [-47.6148, 69.5068, 18.7397]
-    b = [0.045657, -0.040721, 0.0079700]
+    a = (-47.6148, 69.5068, 18.7397)
+    b = (0.045657, -0.040721, 0.0079700)
     
     # Bunsen solubility in cc gas @STP / mL H2O atm-1
     CO_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
@@ -1012,8 +1018,8 @@ def H2sol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # Table 1 in Weisenburg and Guinasso 1979
-    a = [-47.8948, 65.0368, 20.1709]
-    b = [-0.082225, 0.049564, -0.0078689]
+    a = (-47.8948, 65.0368, 20.1709)
+    b = (-0.082225, 0.049564, -0.0078689)
     
     # Bunsen solubility in cc gas @STP / mL H2O atm-1
     H2_beta = np.exp(a[0] + a[1] * 100/y + a[2] * np.log(y_100) +  x * \
@@ -1035,47 +1041,49 @@ def H2sol(SA,CT,p,long,lat):
 
 
 def air_mol_fract(gas=None):
-    if gas in ['O2','He','Ne','Ar','Kr','Xe','N2']:
+    g_up = gas.upper()
+    if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
         frac_dict = {'O2':np.array([0.209790]), \
-                 'He':np.array([5.24e-6]), \
-                 'Ne':np.array([0.00001818]), \
-                 'Ar':np.array([0.009332]), \
-                 'Kr':np.array([0.00000114]), \
-                 'Xe':np.array([8.7e-8]), \
+                 'HE':np.array([5.24e-6]), \
+                 'NE':np.array([0.00001818]), \
+                 'AR':np.array([0.009332]), \
+                 'KR':np.array([0.00000114]), \
+                 'XE':np.array([8.7e-8]), \
                  'N2':np.array([0.780848]) }
     else:
         raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
                          N2")
-    return frac_dict[gas]
+    return frac_dict[g_up]
 
 def mol_vol(gas=None):
-    vol_dict = {'He':np.array([22.4263]), \
-                 'Ne':np.array([22.4241]), \
-                 'Ar':np.array([22.3924]), \
-                 'Kr':np.array([22.3518]), \
-                 'Xe':np.array([22.2582]), \
+    g_up = gas.upper()
+    vol_dict = {'HE':np.array([22.4263]), \
+                 'NE':np.array([22.4241]), \
+                 'AR':np.array([22.3924]), \
+                 'KR':np.array([22.3518]), \
+                 'XE':np.array([22.2582]), \
                  'O2':np.array([22.3922]), \
                  'N2':np.array([22.4045]), \
                  'N2O':np.array([22.243]), \
                  'CO2':np.array([0.99498*22.414]), \
                  'CH4':np.array([22.360]), \
                  'H2':np.array([22.428]) }
-    return vol_dict[gas]
+    return vol_dict[g_up]
 
-def mol_vol_calc(gas=None,t=298.15):
-    """
-    http://www.kayelaby.npl.co.uk/chemistry/3_5/3_5.html
-    """
-    B_dict = {'CO': [202.6,154.2,94.2]}
-    bcoeff = B_dict[gas]
-    B = bcoeff[0] - bcoeff[1] * np.exp(bcoeff[2]*t / 298.15)
-    
-    # quadratic coefficients
-    a = 1 / (R * 298.15)
-    b = -1
-    c = -B
-    print (B)
-    print(a)
-    V = b + np.sqrt(1 - 4 * a * c) / 2 * a
-    return V
+#def mol_vol_calc(gas=None,t=298.15):
+#    """
+#    http://www.kayelaby.npl.co.uk/chemistry/3_5/3_5.html
+#    """
+#    B_dict = {'CO': [202.6,154.2,94.2]}
+#    bcoeff = B_dict[gas]
+#    B = bcoeff[0] - bcoeff[1] * np.exp(bcoeff[2]*t / 298.15)
+#    
+#    # quadratic coefficients
+#    a = 1 / (R * 298.15)
+#    b = -1
+#    c = -B
+#    print (B)
+#    print(a)
+#    V = b + np.sqrt(1 - 4 * a * c) / 2 * a
+#    return V
     
