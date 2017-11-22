@@ -94,7 +94,7 @@ def diff(SP,pt,*,gas=None):
            
     if g_up in AEa_dict.keys():
         #freshwater diffusivity
-        AEa = AEa_dict[gas]
+        AEa = AEa_dict[g_up]
         D0 = AEa[0] * np.exp(-AEa[1] / (R * (pt+273.15)))
         #salinity correction
         D = D0 * (1 - 0.049 * SP / 35.5)
@@ -106,9 +106,9 @@ def diff(SP,pt,*,gas=None):
 
 @match_args_return
 def schmidt(SP,pt,*,gas=None):
-    g_up = gas.upper
+    g_up = gas.upper()
     if g_up not in GAS_LIST:
-        raise ValueError("gas: must be one of ", GAS_LIST)
+        raise ValueError("gas", g_up, " does not match one of ", GAS_LIST)
         
     Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 
     return Sc

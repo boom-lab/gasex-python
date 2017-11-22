@@ -86,7 +86,54 @@ def vpress_w(t):
     
     return vpress_w
 
+@match_args_return
+def cdlp81( u10):
+    # Calculates drag coefficient from u10, wind speed at 10 m height
     
+    cd = 4.9e-4 + 6.5e-5 * u10
+    if isinstance(cd,float):
+        cd = np.asarray(cd)
+    cd[u10 <= 11] = 0.0012
+    cd[u10 >= 20] = 0.0018
+    return cd   
+
+
+@match_args_return
+def u_2_u10(u_meas,height):
+    """
+    % u10 = calc_u10(umeas,hmeas)
+    %
+    % USAGE:-------------------------------------------------------------------
+    % 
+    % [u10] = u_2_u10(5,4)
+    %
+    % >u10 = 5.5302
+    %
+    % DESCRIPTION:-------------------------------------------------------------
+    % Scale wind speed from measurement height to 10 m height
+    %
+    % INPUTS:------------------------------------------------------------------
+    % umeas:  measured wind speed (m/s)
+    % hmeas:  height of measurement (m)
+    %
+    % OUTPUTS:-----------------------------------------------------------------
+    %
+    % u10:   calculated wind speed at 10 m
+    %
+    % REFERENCE:---------------------------------------------------------------
+    %
+    % Hsu S, Meindl E A and Gilhousen D B (1994) Determining the Power-Law
+    %    Wind-Profile Exponent under Near-Neutral Stability Conditions at Sea 
+    %    J. Appl. Meteor. 33 757-765
+    %
+    % AUTHOR:---------------------------------------------------------------
+    % David Nicholson -  Adapted from calc_u10.m by Cara Manning
+    %
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    """
+    
+    u10 = u_meas * (10.0 / height)**0.11
+    return u10
     
 #@match_args_return
 #def vpress_sw(SP,pt):

@@ -73,13 +73,15 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
     else:
         raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
                          N2")
-    if units not in ("M","uM","umolkg"):
+    if units not in ("M","mM","uM","umolkg"):
         raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
     SA = SP * 35.16504/35
     CT = CT_from_pt(SA,pt)
     dens = rho(SA,CT,0)    
     if units == "M":        
         eq =  p_corr * dens * soleq / 1e9
+    elif units =="mM":
+        eq =  p_corr * dens * soleq / 1e6
     elif units =="uM":
         eq =  p_corr * dens * soleq / 1e3
     elif units == 'umolkg':
@@ -111,6 +113,8 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
                          'Ar','Kr','Xe','N2','CO2',N2O','CH4','CO' or 'H2'")
     if units == "M":
         return p_dry * K0
+    elif units =="mM":
+        return p_dry * K0 * 1e3
     elif units == 'umolkg':
         SA = SP * 35.16504/35
         CT = CT_from_pt(SA,pt)
