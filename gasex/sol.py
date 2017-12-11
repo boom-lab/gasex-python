@@ -24,7 +24,7 @@ __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
 
 
 @match_args_return
-def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
+def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
     """
     Description:
     -----------
@@ -73,14 +73,14 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
     else:
         raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
                          N2")
-    if units not in ("M","mM","uM","umolkg"):
+    if units not in ("M","mM","uM","molm3","umolkg"):
         raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
     SA = SP * 35.16504/35
     CT = CT_from_pt(SA,pt)
     dens = rho(SA,CT,0)    
     if units == "M":        
         eq =  p_corr * dens * soleq / 1e9
-    elif units =="mM":
+    elif units =="mM" or units =="molm3":
         eq =  p_corr * dens * soleq / 1e6
     elif units =="uM":
         eq =  p_corr * dens * soleq / 1e3
@@ -92,7 +92,7 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="M"):
         
         
 @match_args_return
-def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
+def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="mM"):
     g_up = gas.upper()
     vp_sw = vpress_sw(SP,pt)
     if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
@@ -113,7 +113,7 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
                          'Ar','Kr','Xe','N2','CO2',N2O','CH4','CO' or 'H2'")
     if units == "M":
         return p_dry * K0
-    elif units =="mM":
+    elif units =="mM" or units == "molm3":
         return p_dry * K0 * 1e3
     elif units == 'umolkg':
         SA = SP * 35.16504/35
@@ -128,7 +128,7 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="M"):
 def O2sol_SP_pt(SP,pt):
 
     """
-     gsw_O2_SP_pt                              solubility of O2 in seawater
+     O2sol_SP_pt                              solubility of O2 in seawater
     ==========================================================================
     
      USAGE: 
@@ -154,7 +154,9 @@ def O2sol_SP_pt(SP,pt):
      OUTPUT:
       O2sol = solubility of oxygen in micro-moles per kg           [ umol/kg ] 
      
-     AUTHOR:  Roberta Hamme, Paul Barker and Trevor McDougall
+     AUTHOR:  David Nicholson
+     Adapted from gsw_Arsol_SP_pt.m authored by Roberta Hamme, Paul Barker and 
+         Trevor McDougall
 
      REFERENCES:
       IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of 
@@ -189,7 +191,7 @@ def O2sol_SP_pt(SP,pt):
     y = np.log((25+K0 - pt68)/(K0 + pt68))
 
 # The coefficents below are from the second column of Table 1 of Garcia and
-# Gordon (1992)
+# Gordon (1992) for fit to Benson and Krause (1984)
     a = (5.80871,3.20291,4.17887,5.10006,-9.86643e-2,3.80369) 
     b = (-7.01577e-3,-7.70028e-3,-1.13864e-2,-9.51519e-3)
     c = -2.75915e-7
@@ -215,11 +217,11 @@ def O2sol(SA,CT,p,long,lat):
 @match_args_return
 def Hesol_SP_pt(SP,pt):
     """
-     gsw_Hesol_SP_pt                              solubility of He in seawater
+     Hesol_SP_pt                              solubility of He in seawater
     ==========================================================================
     
      USAGE:  
-      Hesol = gsw_Hesol_SP_pt(SP,pt)
+      Hesol = Hesol_SP_pt(SP,pt)
     
      DESCRIPTION:
       Calculates the helium concentration expected at equilibrium with air at 
@@ -241,8 +243,9 @@ def Hesol_SP_pt(SP,pt):
      OUTPUT:
       Hesol = solubility of helium in micro-moles per kg           [ umol/kg ] 
      
-     AUTHOR:  Roberta Hamme, Paul Barker and Trevor McDougall
-                                                          [ help@teos-10.org ]
+     AUTHOR:  David Nicholson
+     Adapted from gsw_Arsol_SP_pt.m authored by Roberta Hamme, Paul Barker and 
+         Trevor McDougall
     
      VERSION NUMBER: 3.05 (27th January 2015)
     
@@ -258,7 +261,6 @@ def Hesol_SP_pt(SP,pt):
       Weiss, R.F., 1971: Solubility of Helium and Neon in Water and Seawater.
        J. Chem. and Engineer. Data, 16, 235-241.
     
-      The software is available from http://www.TEOS-10.org
     
     ==========================================================================
     """
@@ -297,7 +299,7 @@ def Hesol(SA,CT,p,long,lat):
 @match_args_return
 def Nesol_SP_pt(SP,pt):
     """
-     gsw_Nesol_SP_pt                              solubility of Ne in seawater
+     Nesol_SP_pt                              solubility of Ne in seawater
     ==========================================================================
     
      USAGE:  
@@ -321,10 +323,11 @@ def Nesol_SP_pt(SP,pt):
       SP & pt need to have the same dimensions.
     
      OUTPUT:
-      Nesol = solubility of neon in nano-moles per kg              [ nmol/kg ] 
+      Nesol = solubility of neon in umol per kg              [ umol/kg ] 
      
-     AUTHOR:  Roberta Hamme, Paul Barker and Trevor McDougall
-                                                          [ help@teos-10.org ]
+     AUTHOR:  David Nicholson
+     Adapted from gsw_Arsol_SP_pt.m authored by Roberta Hamme, Paul Barker and 
+         Trevor McDougall
     
      REFERENCES:
       IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of 
@@ -336,7 +339,7 @@ def Nesol_SP_pt(SP,pt):
        argon in distilled water and seawater. Deep-Sea Research, 51, 
        1517-1528.
     
-      The software is available from http://www.TEOS-10.org
+      
     
     ==========================================================================
     """
@@ -344,9 +347,8 @@ def Nesol_SP_pt(SP,pt):
     # Note that salinity argument is Practical Salinity, this is
     # beacuse the major ionic components of seawater related to Cl  
     # are what affect the solubility of non-electrolytes in seawater.   
-    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
-              # the 1968 International Practical Temperature Scale IPTS-68.
-    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
+    
+    y = np.log((25+K0 - pt)/(K0 + pt)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
@@ -397,9 +399,8 @@ def Arsol_SP_pt(SP,pt):
       Arsol = solubility of argon                                  [ umol/kg ] 
      
      AUTHOR:  David Nicholson
-     Adapted from gsw_Arsol_SP_pt authored by Roberta Hamme, Paul Barker and 
+     Adapted from gsw_Arsol_SP_pt.m authored by Roberta Hamme, Paul Barker and 
          Trevor McDougall
-                                                          [ help@teos-10.org ]
     
      REFERENCES:
       IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of 
@@ -411,7 +412,6 @@ def Arsol_SP_pt(SP,pt):
        argon in distilled water and seawater. Deep-Sea Research, 51, 
        1517-1528.
     
-      The software is available from http://www.TEOS-10.org
     
     ==========================================================================
     """
@@ -420,9 +420,9 @@ def Arsol_SP_pt(SP,pt):
     # Note that salinity argument is Practical Salinity, this is
     # beacuse the major ionic components of seawater related to Cl  
     # are what affect the solubility of non-electrolytes in seawater.   
-    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+    #pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
               # the 1968 International Practical Temperature Scale IPTS-68.
-    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
+    y = np.log((25+K0 - pt)/(K0 + pt)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)
@@ -635,12 +635,9 @@ def N2sol_SP_pt(SP,pt):
     x = SP     
     # Note that salinity argument is Practical Salinity, this is
     # beacuse the major ionic components of seawater related to Cl  
-    # are what affect the solubility of non-electrolytes in seawater.   
-    
-    pt68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
-              # the 1968 International Practical Temperature Scale IPTS-68.
+    # are what affect the solubility of non-electrolytes in seawater.      
               
-    y = np.log((25+K0 - pt68)/(K0 + pt68)) 
+    y = np.log((25+K0 - pt)/(K0 + pt)) 
     # pt is the temperature in degress C on the ITS-90 scale
     
     # The coefficents below are from Table 4 of Hamme and Emerson (2004)

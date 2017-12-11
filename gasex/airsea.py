@@ -319,7 +319,7 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     return (Fd,Fc,Fp,Deq,Ks)
     
 @match_args_return
-def N16(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None,Ainj=):
+def N16(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     """
     % Function to calculate air-sea gas exchange flux using Nicholson 16
     % parameterization
