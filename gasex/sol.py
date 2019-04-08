@@ -119,7 +119,7 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="mM"):
         SA = SP * 35.16504/35
         CT = CT_from_pt(SA,pt)
         dens = rho(SA,CT,0)
-        return 1e-6 * p_dry * K0 / dens
+        return 1e-3 * p_dry * K0 / dens
     else:
         raise ValueError("units: units must be \'M\' or \'umolkg\'")
 
