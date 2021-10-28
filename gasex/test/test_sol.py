@@ -85,6 +85,37 @@ class TestCheckVals(unittest.TestCase):
             result = diff.diff(35,20,gas=gases[i])
             self.assertTrue(abs(result/d_check[i] - 1) < tolx)
     
+    def test_schmidt(self):
+        """
+        Test schmidt number check values
+        """
+        gases = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
+        sc_check_sw = {'CO2': 668,
+            'N2O': 697,
+            'CH4':687,
+            'RN': 985,
+            'SF6':1028,
+            'DMS':941,
+            'CFC12':1188,
+            'CFC11':1179,
+            'CH3BR':701,
+            'CCL4': 1315 }
+        sc_check_fw = {'CO2': 600,
+            'N2O': 626,
+            'CH4':617,
+            'RN': 884,
+            'SF6':953,
+            'DMS':844,
+            'CFC12':1066,
+            'CFC11':1126,
+            'CH3BR':670,
+            'CCL4': 1181 }
+        for gas in sc_check_sw.keys():
+            sw_result = diff.schmidt_W14(20,gas=gas,sw=True)
+            fw_result = diff.schmidt_W14(20,gas=gas,sw=False)
+            self.assertTrue(round(sw_result)==sc_check_sw[gas])
+            self.assertTrue(round(fw_result)==sc_check_fw[gas])
+    
 
 
 if __name__ == '__main__':

@@ -466,8 +466,7 @@ def N11(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     %   An inverse approach to estimate bubble-mediated air-sea gas flux from 
     %   inert gas measurements.  Proceedings on the 6th International Symposium
     %   on Gas Transfer at Water Surfaces.  Kyoto University Press.
-    """"
-    
+    """
     # 1.5 factor converts from average winds to instantaneous - see N11 ref.
     Ainj = 2.51e-9 / 1.5
     Aex = 1.15e-5 / 1.5

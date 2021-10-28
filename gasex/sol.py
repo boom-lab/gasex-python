@@ -1042,6 +1042,17 @@ def H2sol(SA,CT,p,long,lat):
 
 
 def air_mol_fract(gas=None):
+    """molar mixing ratio for well-mixed gases
+
+    Args:
+        gas ([string], optional): abbreviation for gas. Defaults to None.
+
+    Raises:
+        ValueError: [description]
+
+    Returns:
+        xG: molar atmospheric mixing ratio for well-lixed gases ('O2','HE','NE','AR','KR','XE' or 'N2')
+    """
     g_up = gas.upper()
     if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
         frac_dict = {'O2':np.array([0.209790]), \

@@ -32,20 +32,35 @@ def match_args_return(f):
             args = list(args)
             args.append(p)
 
-        isarray = np.any([hasattr(a, '__iter__') for a in args])
-        ismasked = np.any([np.ma.isMaskedArray(a) for a in args])
+        isarray = [hasattr(a, '__iter__') for a in args]
+        ismasked = [np.ma.isMaskedArray(a) for a in args]
+        isduck = [hasattr(a, '__array_ufunc__')
+                    and not isinstance(a, np.ndarray) for a in args]
+
+        hasarray = np.any(isarray)
+        hasmasked = np.any(ismasked)
+        hasduck = np.any(isduck)
 
         def fixup(ret):
-            if ismasked:
+            if hasduck:
+                return ret
+            if hasmasked:
                 ret = np.ma.masked_invalid(ret)
-            if not isarray and isinstance(ret, np.ndarray):
-                ret = ret[0]
+            if not hasarray and isinstance(ret, np.ndarray) and ret.size == 1:
+                try:
+                    ret = ret[0]
+                except IndexError:
+                    pass
             return ret
 
-        if ismasked:
-            newargs = [masked_to_nan(a) for a in args]
-        else:
-            newargs = [np.asarray(a, dtype=float) for a in args]
+        newargs = []
+        for i, arg in enumerate(args):
+            if ismasked[i]:
+                newargs.append(masked_to_nan(arg))
+            elif isduck[i]:
+                newargs.append(arg)
+            else:
+                newargs.append(np.asarray(arg, dtype=float))
 
         if p is not None:
             kw['p'] = newargs.pop()
@@ -75,7 +90,6 @@ def axis_slicer(n, sl, axis):
 def indexer(shape, axis, order='C'):
     """
     Generator of indexing tuples for "apply_along_axis" usage.
-
     The generator cycles through all axes other than `axis`.
     The numpy np.apply_along_axis function only works with functions
     of a single array; this generator allows us work with a function
@@ -113,12 +127,10 @@ def indexer(shape, axis, order='C'):
 class Bunch(dict):
     """
     A dictionary that also provides access via attributes.
-
     Additional methods update_values and update_None provide
     control over whether new keys are added to the dictionary
     when updating, and whether an attempt to add a new key is
     ignored or raises a KeyError.
-
     The Bunch also prints differently than a normal
     dictionary, using str() instead of repr() for its
     keys and values, and in key-sorted order.  The printing
@@ -127,7 +139,6 @@ class Bunch(dict):
     class attribute, because that would substitute an instance
     attribute which would then become part of the Bunch, and
     would be reported as such by the keys() method.
-
     To output a string representation with
     a particular format, without subclassing, use the
     formatted() method.
@@ -161,9 +172,7 @@ class Bunch(dict):
     def formatted(self, fmt=None, types=False):
         """
         Return a string with keys and/or values or types.
-
         *fmt* is a format string as used in the str.format() method.
-
         The str.format() method is called with key, value as positional
         arguments, and klen, vlen as kwargs.  The latter are the maxima
         of the string lengths for the keys and values, respectively,
@@ -217,7 +226,6 @@ class Bunch(dict):
         arguments are dictionary-like; if present, they act as
         additional sources of kwargs, with the actual kwargs
         taking precedence.
-
         One reserved optional kwarg is "strict".  If present and
         True, then any attempt to update with keys that are not
         already in the Bunch instance will raise a KeyError.
