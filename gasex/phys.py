@@ -27,42 +27,42 @@ atm2mmhg = 760.0
 @match_args_return
 def visc(SP,pt):
     """
-    Calculated the Kinematic Viscosity of Seawater as a function of salinity 
+    Calculated the Kinematic Viscosity of Seawater as a function of salinity
     Temperature
-    
+
     Parameters
     ----------
     SP : array-like
         Practical Salinity
     pt : array-like
         Potential Temperature,      [degrees C]
-    
+
     Returns
     -------
-    visc : array-like, 
+    visc : array-like,
         Kinematic Viscosity in      [m2 s-1]
-    
+
     Author: David Nicholson
     -------
     Adapted from SW_VISC MATLAB function by Ayal Anis as described below
-    %   
-    % visc 
-    % 
-    % 
-    % SW_VISC  $Revision: 0.0 $  $Date: 1998/01/19 $
-    %          Copyright (C) Ayal Anis 1998. 
     %
-    % USAGE:  visc = sw_visc(S,T,P) 
+    % visc
+    %
+    %
+    % SW_VISC  $Revision: 0.0 $  $Date: 1998/01/19 $
+    %          Copyright (C) Ayal Anis 1998.
+    %
+    % USAGE:  visc = sw_visc(S,T,P)
     %
     % DESCRIPTION:
-    %    Calculates kinematic viscosity of sea-water. 
+    %    Calculates kinematic viscosity of sea-water.
     %    based on Dan Kelley's fit to Knauss's TABLE II-8
     """
-    
+
 
     SA = SP * 35.16504/35
     CT = CT_from_pt(SA,pt)
-    dens = rho(SA,CT,0)
+    dens = rho(SA,CT,0*CT)
     visc = 1e-4 * (17.91 - 0.5381 * pt + 0.00694 * pt**2 + 0.02305 * SP) / dens
     return visc
 
@@ -81,21 +81,21 @@ def vpress_w(t):
     # Calculate value of Wagner polynomial
     wagner = -7.85951783*tmod + 1.84408259*tmod**1.5 - 11.7866497*tmod**3 + \
         22.6807411 * tmod**3.5 - 15.9618719*tmod**4 + 1.80122502*tmod**7.5
-    # Vapor pressure of pure water in Pascals 
+    # Vapor pressure of pure water in Pascals
     vpress_w = np.exp(wagner * 647.096 / (t + K0)) * 22.064 * 1e6 / atm2pa
-    
+
     return vpress_w
 
 @match_args_return
 def cdlp81( u10):
     # Calculates drag coefficient from u10, wind speed at 10 m height
-    
+
     cd = 4.9e-4 + 6.5e-5 * u10
     if isinstance(cd,float):
         cd = np.asarray(cd)
     cd[u10 <= 11] = 0.0012
     cd[u10 >= 20] = 0.0018
-    return cd   
+    return cd
 
 
 @match_args_return
@@ -104,7 +104,7 @@ def u_2_u10(u_meas,height):
     % u10 = calc_u10(umeas,hmeas)
     %
     % USAGE:-------------------------------------------------------------------
-    % 
+    %
     % [u10] = u_2_u10(5,4)
     %
     % >u10 = 5.5302
@@ -123,7 +123,7 @@ def u_2_u10(u_meas,height):
     % REFERENCE:---------------------------------------------------------------
     %
     % Hsu S, Meindl E A and Gilhousen D B (1994) Determining the Power-Law
-    %    Wind-Profile Exponent under Near-Neutral Stability Conditions at Sea 
+    %    Wind-Profile Exponent under Near-Neutral Stability Conditions at Sea
     %    J. Appl. Meteor. 33 757-765
     %
     % AUTHOR:---------------------------------------------------------------
@@ -131,29 +131,29 @@ def u_2_u10(u_meas,height):
     %
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     """
-    
+
     u10 = u_meas * (10.0 / height)**0.11
     return u10
-    
+
 #@match_args_return
 #def vpress_sw(SP,pt):
 #    """
 #    pv,w data from Ambrose and Lawrenson [88]
-#    Validity: pv,sw and pv,w in (mm Hg); 0 < t68 < 40 oC; 0 < SP < 40 g/kg; 
+#    Validity: pv,sw and pv,w in (mm Hg); 0 < t68 < 40 oC; 0 < SP < 40 g/kg;
 #    Accuracy: ±0.02%
-#    
+#
 #    REFERENCE:
 #        F. J. Millero, The thermodynamics of seawater. Part II; Thermochemical
 #        properties, Ocean Science and Engineering, 8(1), 1-40, 1983.
-#        
-#        Eq. 33 in Sharqawy, Mostafa H., John H. Lienhard V and Syed M. Zubair. 
-#        "The thermophysical properties of seawater: A review of existing 
-#        correlations and data." Desalination and Water Treatment, 16 
+#
+#        Eq. 33 in Sharqawy, Mostafa H., John H. Lienhard V and Syed M. Zubair.
+#        "The thermophysical properties of seawater: A review of existing
+#        correlations and data." Desalination and Water Treatment, 16
 #        (April 2010) 354–380
-#    
+#
 #    """
-#    
-#    t68 = pt * 1.00024     # pt68 is the potential temperature in degress C on 
+#
+#    t68 = pt * 1.00024     # pt68 is the potential temperature in degress C on
 #              # the 1968 International Practical Temperature Scale IPTS-68.
 #    A = -2.3311e-3 - t68 * (1.4799e-4  - t68 * (7.520e-6  - t68 * 5.5185e-8))
 #    B = -1.1320e-5 - t68 * (8.7086-6  + t68 * (7.4936-7  - t68 * 2.6327e-8))
@@ -166,7 +166,7 @@ def u_2_u10(u_meas,height):
 #@match_args_return
 #def vpress_w(t):
 #    """
-#    Water vapor pressure over fresh water 
+#    Water vapor pressure over fresh water
 #    """
 #    TK = t + K0
 #
@@ -174,6 +174,3 @@ def u_2_u10(u_meas,height):
 #    pv_w = np.exp(A[0]/TK + A[1] + A[2]*TK + A[3]*TK**2 + A[4]*TK**3 + \
 #                  A[5] * np.log(TK))
 #    return pv_w
-
-
-

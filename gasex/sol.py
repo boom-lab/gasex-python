@@ -77,7 +77,7 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
         raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
     SA = SP * 35.16504/35
     CT = CT_from_pt(SA,pt)
-    dens = rho(SA,CT,0)
+    dens = rho(SA,CT,0*CT)
     if units == "M":
         eq =  p_corr * dens * soleq / 1e9
     elif units =="mM" or units =="molm3":
@@ -118,10 +118,10 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="mM"):
     elif units == 'umolkg':
         SA = SP * 35.16504/35
         CT = CT_from_pt(SA,pt)
-        dens = rho(SA,CT,0)
+        dens = rho(SA,CT,0*CT)
         return 1e-3 * p_dry * K0 / dens
     else:
-        raise ValueError("units: units must be \'M\' or \'umolkg\'")
+        raise ValueError("units: units must be \'M\', \'mM\',\'molm3\' or \'umolkg\'")
 
 
 @match_args_return

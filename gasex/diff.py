@@ -11,7 +11,7 @@
 % 
 %
 % Support for additional gases ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
-% has been added based on Wanninkhof 2014 
+% has been added based on Wanninkhof 2014.
 %
 % Table 1:
 % Sc = A + Bt + Ct2+ dt3+ Et4(t in °C). The last column is the calculated Schmidt number for 20°C. 
