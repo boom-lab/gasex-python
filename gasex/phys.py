@@ -18,6 +18,9 @@ K0 = 273.15
 # Gas Constant in J / mol K
 R = 8.3144598
 
+# Gas constant in L atm / (mol K)
+RatmLmolK = 0.082057366080960
+
 # 1 atm in Pa
 atm2pa = 101325.0
 
