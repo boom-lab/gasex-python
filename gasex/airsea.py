@@ -243,20 +243,20 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     slp_corr = (slp - ph2ov) /(1 - ph2oveq)
 
     # -------------------------------------------------------------------------
-    # Parameters for COARE 3.0 calculation
+    # Parameters for COARE 3.0 calculation - diffusive gas exchange
     # -------------------------------------------------------------------------
 
     # Calculate potential density at surface
     SA = SP * 35.16504 / 35
     CT = CT_from_pt(SA,pt)
-    rhow = rho(SA,CT,0*CT)
-    rhoa = 1.225
+    rhow = rho(SA,CT,0*CT) # density of water
+    rhoa = 1.225 # density of air
 
-    lam = 13.3
-    A = 1.3
-    phi = 1
-    tkt = 0.01
-    hw = lam /A / phi
+    lam = 13.3 # numerator in Fairall et al., 2011 eqn. (14)
+    A = 1.3 # constant, determined empirically by Fairall et al. (2011)
+    phi = 1 # buoyancy term. Except for light wind cases, phi=1 (Fairall et al., 2011)
+    tkt = 0.01 # molecular sublayer thickness, ~1 mm (Fairall et al., 2011)
+    hw = lam /A / phi # eqn. 14 of Fairall et al., 2011
     ha = lam
 
     # air-side schmidt number
@@ -272,6 +272,7 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     else:
         xG = chi_atm
         Geq = xG * sol_SP_pt(SP,pt,gas=gas,units="mM")
+    # INSERT AN IF-STATEMENT HERE CALCULATING Geq SPECIFIC TO N2O with N2Ofugacitiy script
 
     alc = (Geq / atm2pa) * R * (pt+K0)
 
@@ -282,19 +283,22 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     # Calculate COARE 3.0 and gas transfer velocities
     # -------------------------------------------------------------------------
     # ustar
+    # eqns. 12 and 13 of Liang et al., 2013
     cd10 = cdlp81(u10)
-    ustar = u10 * np.sqrt(cd10)
+    ustar = u10 * np.sqrt(cd10) # shouldn't this actually be u10*np.sqrt(rhoa*cd10/rhow)?
 
     # water-side ustar
     ustarw = ustar / np.sqrt(rhow / rhoa)
 
     # water-side resistance to transfer
-    rwt = np.sqrt(rhow / rhoa) * (hw * np.sqrt(ScW)+(np.log(0.5 / tkt) /0.4))
+    # eqn. 13 of Fairall et al., 2011
+    rwt = np.sqrt(rhow / rhoa) * (hw * np.sqrt(ScW)+(np.log(0.5 / tkt) /0.4)) # Fairall et al. 2011 define k as 0.4
 
     # air-side resistance to transfer
+    # eqn. 15 of Fairall et al., 2011
     rat = ha * np.sqrt(ScA) + 1 / np.sqrt(cd10) - 5 + 0.5 * np.log(ScA) /0.4
 
-    # diffusive gas transfer coefficient (L13 eqn 9)
+    # diffusive gas transfer coefficient (L13 eqn 9/Fairall 2011 eqn. 11)
     Ks = ustar / (rwt + rat * alc)
 
     # bubble transfer velocity (L13 eqn 14)

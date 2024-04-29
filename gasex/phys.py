@@ -10,6 +10,9 @@ Common physical constants and properties for gas functions
 from __future__ import division
 import numpy as np
 from gsw import rho, CT_from_pt
+from metpy.calc import density # use metpy to calculate air density
+from metpy.units import units
+from metpy.calc import mixing_ratio_from_relative_humidity # calculate mixing ratio of water vapor in air
 from ._utilities import match_args_return
 
 # 0 Celsius in Kelvin
@@ -137,6 +140,34 @@ def u_2_u10(u_meas,height):
 
     u10 = u_meas * (10.0 / height)**0.11
     return u10
+
+def kinematic_viscosity_air(air_temperature, pressure, rh=1.0):
+    """
+    Calculate the kinematic viscosity of air given the air temperature, pressure, and 100% relative humidity.
+
+    Parameters:
+        air_temperature (float): Air temperature in degrees Celsius.
+        pressure (float): Pressure in atm.
+
+    Returns:
+        float: Kinematic viscosity of air in m^2/s.
+    """
+    # Convert air temperature to Kelvin
+    T = air_temperature + 273.15
+    
+    # calculate mixing ratio of water vapor in air
+    xH2O = mixing_ratio_from_relative_humidity(pressure * units.atm, air_temperature * units.degC, rh).to('g/kg')
+    
+    # Calculate density of air
+    rho_a = density(pressure * units.atm, air_temperature * units.degC, xH2O * units('g/kg')) 
+    
+    # Calculate absolute viscosity of air using Sutherland's formula
+    mu_a = (1.458e-6 * T**1.5) / (T + 110.4) * units('kg/m/s') # units are kg/m/s
+    
+    # calculate kinematic viscosity of air
+    nu_a = mu_a / rho_a
+    
+    return mu_a, nu_a
 
 #@match_args_return
 #def vpress_sw(SP,pt):

@@ -70,6 +70,7 @@ from __future__ import division
 import numpy as np
 from numpy.polynomial.polynomial import polyval
 from ._utilities import match_args_return
+from gasex.phyx import kinematic_viscosity_air
 from gasex.phys import R as R 
 from gasex.phys import visc as visc
 
@@ -77,6 +78,7 @@ from gasex.phys import visc as visc
 # Currently supported gases
 # TODO: find N2O, CO diffusivities
 GAS_LIST = ('HE','NE','AR','KR','XE','N2','O2','CH4','N2','CO2')
+W14_LIST = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
 
 @match_args_return
 def diff(SP,pt,*,gas=None):
@@ -126,10 +128,12 @@ def diff(SP,pt,*,gas=None):
 def schmidt(SP,pt,*,gas=None):
 
     g_up = gas.upper()
-    if g_up not in GAS_LIST:
+    if (g_up not in GAS_LIST)&(g_up not in W14_LIST):
         raise ValueError("gas", g_up, " does not match one of ", GAS_LIST)
-        
-    Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 
+    elif g_up in GAS_LIST:    
+        Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 
+    elif g_up in W14_LIST:
+        Sc = schmidt_W14(pt,gas=gas,sw=True)
     return Sc
 
 @match_args_return
@@ -180,3 +184,55 @@ def schmidt_W14(pt,*,gas=None,sw=True):
 
     Sc = polyval(pt,A)
     return Sc
+
+def air_side_Schmidt_number(air_temperature, pressure, rh=1.0, gas=None, calculate=True):
+    """
+    Calculate the air-side Schmidt number.
+
+    Parameters:
+        air_temperature (float): Air temperature in degrees Celsius.
+        sea_level_pressure (float): Sea level pressure in atm.
+        rh (float): relative humidity (default: 1)
+        gas: formula for gas (H2O, CO2, CH4, CO, SO2, O3, NH3, or N2O), formatted as a string, e.g. 'He'
+        calculate: if True, calculate Schmidt number from diffusivity and kinematic viscosity of air;
+                   if False, use default value from lookup table
+
+    Returns:
+        float: Air-side Schmidt number for nitrous oxide (N2O).
+    """
+    # Coefficients of diffusivity (cm2/s) of selected gases in air, 
+    diffusivities = {
+        'H2O': 0.2178, # Massman 1998
+        'CO2': 0.1381, # Massman 1998
+        'CH4': 0.1952, # Massman 1998
+        'CO': 0.1807, # Massman 1998
+        'SO2': 0.1089, # Massman 1998
+        'O3': 0.1444, # Massman 1998
+        'NH3': 0.1978, # Massman 1998
+        'N2O': 0.1436, # Massman 1998
+    }
+    
+    # empirical values from de Richter et al., 2017
+    schmidt_dict = {
+        'H2O': 0.61,
+        'CH4': 0.69,
+        'N2O': 0.93,
+    }
+
+    # can calculate Schmidt number for gases that we have the diffusivities for
+    if (gas in diffusivities.keys())&(calculate==True):
+        # Convert air temperature to Kelvin
+        T = air_temperature + 273.15
+        # Constants for N2O
+        molecular_diffusivity = diffusivities[gas]*1e-4 * units('m2/s')  # convert from cm^2/s to m2/s
+        # Calculate air-side Schmidt number
+        mu_a, nu_a = kinematic_viscosity_air(air_temperature, pressure, rh)
+        ScA = nu_a / molecular_diffusivity
+    # or look up an empirical value
+    elif (gas in schmidt_dict.keys())&(calculate==False):
+        ScA = schmidt_dict[gas] * units('dimensionless')
+    # or just use default value of 0.9 for all other cases
+    else:
+        ScA = 0.9 * units('dimensionless')
+    
+    return ScA
