@@ -70,7 +70,7 @@ from __future__ import division
 import numpy as np
 from numpy.polynomial.polynomial import polyval
 from ._utilities import match_args_return
-from gasex.phyx import kinematic_viscosity_air
+from gasex.phys import kinematic_viscosity_air
 from gasex.phys import R as R 
 from gasex.phys import visc as visc
 

@@ -69,11 +69,7 @@ def N2OCeq(SP, pt, slp=1.0, xn2o=338, v=32.3, watervapor=True, nonideal=True):
     - nonideal: Include non-ideal behavior of N2O (default: True)
 
     Returns:
-    - k0: Equilibrium constant (mol/L/atm)
-    - F: Simplification of C*=K0*f*exp[(1-P)v/RT] (Weiss and Price 1980, eqn. (1)) (mol/L)
-    - Ceq1: Equilibrium concentration of N2O (mol/L), including vapor pressure of water and non-ideal effects
-    - Ceq2: Equilibrium concentration of N2O (mol/L), including vapor pressure of water and but excluding non-ideal effects
-    - Ceq3: Equilibrium concentration of N2O (mol/L), excluding vapor pressure of water and non-ideal effects
+    - Ceq: Equilibrium concentration of N2O (nmol/L), including vapor pressure of water and non-ideal effects
     """  
    
     # Convert partial molal volume from cm3/mol to L/mol
@@ -114,7 +110,7 @@ def N2OCeq(SP, pt, slp=1.0, xn2o=338, v=32.3, watervapor=True, nonideal=True):
     elif (watervapor==False)&(nonideal==True):
         Ceq = xn2o*k0*slp*np.exp(eterm1+eterm2)
     
-    return k0, F, Ceq
+    return Ceq
 
 def pN2Oatm(SP,pt,slp=1.0,xn2o=338, units = "natm", v=32.3, watervapor=True, nonideal=True):
     """
