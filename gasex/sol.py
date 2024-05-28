@@ -16,7 +16,6 @@ from gasex.phys import K0 as K0
 from gasex.phys import vpress_sw, R
 
 
-
 __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
            'Krsol_SP_pt','N2sol_SP_pt','N2Osol_SP_pt','O2sol','Hesol', \
            'Nesol','Arsol','Krsol','N2sol','N2Osol']
@@ -92,12 +91,15 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
 
 
 @match_args_return
-def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="mM"):
+def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,slp=1.0,rh=1.0,chi_atm=None,units="mM"):
     g_up = gas.upper()
-    vp_sw = vpress_sw(SP,pt)
+    vp_sw = vpress_sw(SP,pt)*rh
+    if chi_atm is None:
+        chi_atm = air_mol_fract(gas=gas)
+
     if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
         # solubility for 1 atm dry gas (K0)
-        K0 = eq_SP_pt(SP,pt,gas=gas,units="M") / (air_mol_fract(gas) * (1-vp_sw))
+        K0 = eq_SP_pt(SP,pt,gas=gas,units="M") / (chi_atm * (slp-vp_sw))
     elif gas == 'N2O':
         K0 = N2Osol_SP_pt(SP,pt)
     elif gas == 'CO2':
@@ -112,14 +114,14 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,units="mM"):
         raise ValueError(gas + " is not supported. Must be 'O2','He','Ne',\
                          'Ar','Kr','Xe','N2','CO2',N2O','CH4','CO' or 'H2'")
     if units == "M":
-        return p_dry * K0
+        return K0
     elif units =="mM" or units == "molm3":
-        return p_dry * K0 * 1e3
+        return K0 * 1e3
     elif units == 'umolkg':
         SA = SP * 35.16504/35
         CT = CT_from_pt(SA,pt)
         dens = rho(SA,CT,0*CT)
-        return 1e-3 * p_dry * K0 / dens
+        return 1e-3 * K0 / dens
     else:
         raise ValueError("units: units must be \'M\', \'mM\',\'molm3\' or \'umolkg\'")
 
@@ -234,6 +236,7 @@ def Hesol_SP_pt(SP,pt):
       Oceanographic Toolbox as it seems to be oceanographic best practice.
 
      INPUT:
+
       SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
       pt  =  potential temperature (ITS-90) referenced               [ deg C ]
              to one standard atmosphere (0 dbar).
@@ -685,7 +688,7 @@ def N2Osol_SP_pt(SP,pt):
       SP & pt need to have the same dimensions.
 
      OUTPUT:
-      N2Osol = K' solubility of nitrous oxide                 mol kg-1 atm-1 ]
+      N2Osol = K' solubility of nitrous oxide                 mol L-1 atm-1 ]
               (solubility in moist air at total pressure of 1 atm)
 
      AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
@@ -1054,17 +1057,18 @@ def air_mol_fract(gas=None):
         xG: molar atmospheric mixing ratio for well-lixed gases ('O2','HE','NE','AR','KR','XE' or 'N2')
     """
     g_up = gas.upper()
-    if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
+    if g_up in ['O2','HE','NE','AR','KR','XE','N2','N2O']:
         frac_dict = {'O2':np.array([0.209790]), \
                  'HE':np.array([5.24e-6]), \
                  'NE':np.array([0.00001818]), \
                  'AR':np.array([0.009332]), \
                  'KR':np.array([0.00000114]), \
                  'XE':np.array([8.7e-8]), \
-                 'N2':np.array([0.780848]) }
+                 'N2':np.array([0.780848]), \
+                 'N2O':np.array([338e-9]) }
     else:
-        raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
-                         N2")
+        raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe,N2, or \
+                         N2O")
     return frac_dict[g_up]
 
 def mol_vol(gas=None):

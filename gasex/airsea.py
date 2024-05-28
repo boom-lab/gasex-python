@@ -272,7 +272,6 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     else:
         xG = chi_atm
         Geq = xG * sol_SP_pt(SP,pt,gas=gas,units="mM")
-    # INSERT AN IF-STATEMENT HERE CALCULATING Geq SPECIFIC TO N2O with N2Ofugacitiy script
 
     alc = (Geq / atm2pa) * R * (pt+K0)
 

@@ -10,9 +10,6 @@ Common physical constants and properties for gas functions
 from __future__ import division
 import numpy as np
 from gsw import rho, CT_from_pt
-from metpy.calc import density # use metpy to calculate air density
-from metpy.units import units
-from metpy.calc import mixing_ratio_from_relative_humidity # calculate mixing ratio of water vapor in air
 from ._utilities import match_args_return
 
 # 0 Celsius in Kelvin
@@ -99,8 +96,10 @@ def cdlp81( u10):
     cd = 4.9e-4 + 6.5e-5 * u10
     if isinstance(cd,float):
         cd = np.asarray(cd)
-    cd[u10 <= 11] = 0.0012
-    cd[u10 >= 20] = 0.0018
+    # Xarray DataArrays do not support direct assignment (e.g. cd[u10 <= 11] = 0.0012)
+    # ...but they do support np.where
+    cd = np.where(u10 <= 11, 0.0012, cd)
+    cd = np.where(u10 >= 20, 0.0018, cd)
     return cd
 
 
@@ -141,33 +140,100 @@ def u_2_u10(u_meas,height):
     u10 = u_meas * (10.0 / height)**0.11
     return u10
 
-def kinematic_viscosity_air(air_temperature, pressure, rh=1.0):
+@match_args_return
+def kinematic_viscosity_air(air_temperature, air_density):
     """
-    Calculate the kinematic viscosity of air given the air temperature, pressure, and 100% relative humidity.
+    Calculate the kinematic viscosity of air given the air temperature and air density.
+    Used in calculating air-side schmidt number (gasex.diff.air_side_Schmidt_number)
 
     Parameters:
-        air_temperature (float): Air temperature in degrees Celsius.
-        pressure (float): Pressure in atm.
+        air_temperature (array-like): Air temperature in degrees Celsius.
+        air_density (array-like): Air density in kg/m3
 
     Returns:
-        float: Kinematic viscosity of air in m^2/s.
+        float: Kinematic viscosity of air in m^2/s
     """
     # Convert air temperature to Kelvin
-    T = air_temperature + 273.15
+    T = air_temperature + K0
     
-    # calculate mixing ratio of water vapor in air
-    xH2O = mixing_ratio_from_relative_humidity(pressure * units.atm, air_temperature * units.degC, rh).to('g/kg')
+    rho_a = air_density # units are kg/m3
     
-    # Calculate density of air
-    rho_a = density(pressure * units.atm, air_temperature * units.degC, xH2O * units('g/kg')) 
+    # absolute viscosity of air (Sutherland's formula)
+    mu_a = (1.458e-6 * T**1.5) / (T + 110.4) # units are kg/m/s
     
-    # Calculate absolute viscosity of air using Sutherland's formula
-    mu_a = (1.458e-6 * T**1.5) / (T + 110.4) * units('kg/m/s') # units are kg/m/s
-    
-    # calculate kinematic viscosity of air
-    nu_a = mu_a / rho_a
+    # kinematic viscosity of air
+    nu_a = mu_a / rho_a # units are m2/s
     
     return mu_a, nu_a
+
+@match_args_return
+def xH2O_from_rh(SP,pt,slp=1.0,rh=1.0):
+    """
+    Calculate the mixing ratio of H2O from relative humidity.
+    Used in calculation of air density, which factors into air-side Schmidt number (gasex.airsea.L13)
+    Parameters:
+        SP (array-like): Practical salinity
+        pt (array-like): potential temperature in degrees Celsius
+        slp (array-like): sea level pressure in Atm (default: 1.0)
+        rh (array-like): relative humidity (default: 1.0)
+
+    Returns:
+        mixing_ratio (array-like): mixing ratio of water in air in g/kg
+    """    
+    # Calculate vapor pressure at moist interface
+    ph2oveq = vpress_sw(SP,pt) # atm
+    ph2ov = rh * ph2oveq # atm
+    
+    molwt_h2o = 18.01528 # g/mol
+    molwt_air = 28.96 # g/mol
+    
+    # Calculate mixing ratio
+    mixing_ratio = molwt_h2o / molwt_air * ph2ov / (slp - ph2ov) * 1000  # Convert to g/kg
+
+    return mixing_ratio
+
+@match_args_return
+def rh_from_dewpoint_SP_pt(SP, pt, dewpoint):
+    """
+    Calculate relative humidity from sea surface salinity, sea surface temperature,
+    and air dewpoint temperature. Use to calculate relative humidity to feed into
+    gas exchange calculation if you don't want to assume rh=100%.
+    Parameters:
+        SP (array-like): Practical salinity
+        pt (array-like): potential temperature in degrees Celsius
+        dewpoint (array-like): dewpoint temperature in degrees Celsius
+
+    Returns:
+        rh (array-like): relative humidity
+    """  
+    # Calculate vapor pressure at moist interface
+    es = vpress_sw(SP,pt) # atm
+    e = vpress_sw(SP,dewpoint) # atm
+    
+    rh = e/es
+    
+    return rh
+
+@match_args_return
+def rh_from_dewpoint_t2m(t2m, dewpoint):
+    """
+    Calculate relative humidity from air temperature and air dewpoint temperature.
+    Use to calculate relative humidity to feed into gas exchange calculation
+    if you don't want to assume rh=100%.
+    Parameters:
+        t2m (array-like): Air temperature at 2 meters in degrees Celsius
+        dewpoint (array-like): dewpoint temperature at 2 meters in degrees Celsius
+
+    Returns:
+        rh (array-like): relative humidity
+    """   
+    # Calculate vapor pressure at moist interface
+    es = vpress_w(t2m) # atm
+    e = vpress_w(dewpoint) # atm
+    
+    rh = e/es
+    
+    return rh
 
 #@match_args_return
 #def vpress_sw(SP,pt):

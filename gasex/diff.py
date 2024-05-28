@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-% Diffusion coeff and Schmidt number for gases in fresh/sea water
+% Diffusion coeff and Schmidt number for gases in fresh/sea water and air
 %=========================================================================
 % Modified by D. Nicholson from MATLAB gas_diffusion Version 2.0 16 July 2013
 %          Author: Roberta C. Hamme (University of Victoria)
@@ -73,6 +73,7 @@ from ._utilities import match_args_return
 from gasex.phys import kinematic_viscosity_air
 from gasex.phys import R as R 
 from gasex.phys import visc as visc
+from gasex.phys import kinematic_viscosity_air
 
 
 # Currently supported gases
@@ -125,16 +126,59 @@ def diff(SP,pt,*,gas=None):
 
 
 @match_args_return
-def schmidt(SP,pt,*,gas=None):
+def schmidt(SP,pt,*,gas=None, schmidtcalc=None):
+    """
+    Calculate water-side Schmidt number from salinity and potential temperature.
+    Parameters:
+        SP (array-like): Practical salinity
+        pt (array-like): potential temperature in degrees Celsius
+        gas (string): 'NE', 'CFC11', 'HE', 'CH4', 'SF6', 'XE', 'CCL2', 'CO2', 'CFC12', 'DMS', 'AR', 'RN', 'CCL4', 'KR', 'O2', 'N2', 'CCL3', 'CH3BR', or 'N2O'
+        schmidtcalc (string): 'viscdiff', 'W14', or 'W92' (Default: viscdiff if available for that gas,
+        then W14 if visdiff is not available, then W92 if viscdiff and W14 are not available.)
 
+    Returns:
+        schmidt (array-like): water-side Schmidt number (dimensionless)
+    """  
+    GAS_LIST = ('HE','NE','AR','KR','XE','N2','O2','CH4','N2','CO2')
+    W14_LIST = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
+    W92_LIST = ('HE','NE','AR','O2','CH4','CO2','N2','KR','N2O','RN','SF6','CCL2','CCL3')
+    
     g_up = gas.upper()
-    if (g_up not in GAS_LIST)&(g_up not in W14_LIST):
-        raise ValueError("gas", g_up, " does not match one of ", GAS_LIST)
-    elif g_up in GAS_LIST:    
-        Sc = visc(SP,pt) / diff(SP,pt,gas=gas) 
-    elif g_up in W14_LIST:
-        Sc = schmidt_W14(pt,gas=gas,sw=True)
-    return Sc
+    
+    if schmidtcalc is None:
+        try:
+            if g_up in GAS_LIST:
+                return visc(SP, pt) / diff(SP, pt, gas=gas)
+            elif g_up in W14_LIST:
+                return schmidt_W14(pt, gas=gas, sw=True)
+            elif g_up in W92_LIST:
+                return schmidt_W92(pt, gas=gas, sw=True)
+            else:
+                raise ValueError(f"gas {g_up} does not match one of {set(GAS_LIST + W14_LIST + W92_LIST)}")
+        except ValueError:
+            raise ValueError(f"gas {g_up} does not match one of {set(GAS_LIST + W14_LIST + W92_LIST)}")
+    
+    if g_up:
+        if g_up not in GAS_LIST and g_up not in W14_LIST and g_up not in W92_LIST:
+            raise ValueError(f"gas {g_up} does not match one of {set(GAS_LIST + W14_LIST + W92_LIST)}")
+        
+        if g_up in GAS_LIST and schmidtcalc == "viscdiff":
+            return visc(SP, pt) / diff(SP, pt, gas=gas)
+        
+        if g_up in W14_LIST and schmidtcalc == "W14":
+            return schmidt_W14(pt, gas=gas, sw=True)
+        
+        if g_up in W92_LIST and schmidtcalc == "W92":
+            return schmidt_W92(pt, gas=gas, sw=True)
+        
+        if schmidtcalc == "viscdiff":
+            return visc(SP, pt) / diff(SP, pt, gas=gas)
+        
+        if schmidtcalc == "W14":
+            return schmidt_W14(pt, gas=gas, sw=True)
+        
+        if schmidtcalc == "W92":
+            return schmidt_W92(pt, gas=gas, sw=True)
 
 @match_args_return
 def schmidt_W14(pt,*,gas=None,sw=True):
@@ -185,9 +229,70 @@ def schmidt_W14(pt,*,gas=None,sw=True):
     Sc = polyval(pt,A)
     return Sc
 
-def air_side_Schmidt_number(air_temperature, pressure, rh=1.0, gas=None, calculate=True):
+@match_args_return
+def schmidt_W92(pt,*,gas=None,sw=True):
+    """Schmidt number @ 35 psu based on Wanninkhof 1992 Table A1
+
+    Args:
+        pt ([array like]): potential temperature  [degree C]
+        gas ([string]): abbreviation for gas. Defaults to None.
+        sw (bool, optional): if True, then calculates for SP = 35, of false, 
+            calculates for fresh water. Defaults to True.
+
+    Raises:
+        ValueError: [description]
+
+    Returns:
+        [type]: Schmidt number [dimensionless]
     """
-    Calculate the air-side Schmidt number.
+    W92_LIST = ('HE','NE','AR','O2','CH4','CO2','N2','KR','N2O','RN','SF6','CCL2','CCL3')
+    if gas is None:
+        raise ValueError(f"please specify gas")
+    else:
+        g_up = gas.upper()
+
+    A_dict = {
+        'HE': (410.14, 20.503, 0.53175, 0.0060111),
+        'NE': (855.1, 46.299, 1.254, 0.01449),
+        'AR': (1909.1, 125.09, 3.9012, 0.048953),
+        'O2': (1953.4, 128.00, 3.9918, 0.050091),
+        'CH4': (2039.2, 120.31, 3.4209, 0.040437),
+        'CO2': (2073.1, 125.62, 3.6276, 0.043219),
+        'N2': (2206.1, 144.86, 4.5413, 0.056988),
+        'KR': (2205.0, 135.71, 3.9549, 0.047339),
+        'N2O': (2301.1, 151.1, 4.7364, 0.059431),
+        'RN': (3412.8, 224.30, 6.7954, 0.08300),
+        'SF6': (3531.6, 231.40, 7.2168, 0.090558),
+        'CCL2': (3713.2, 243.30, 7.5879, 0.095215),
+        'CCL3': (4039.8, 264.70, 8.2552, 0.10359)
+    } if sw else {
+        'HE': (377.09, 19.154, 0.50137, 0.005669),
+        'NE': (764, 42.234, 1.1581, 0.013405),
+        'AR': (1759.7, 117.37, 3.6959, 0.046527),
+        'O2': (1800.6, 120.10, 3.7818, 0.047608),
+        'CH4': (1897.8, 114.28, 3.2902, 0.039061),
+        'CO2': (1911.1, 118.11, 3.4527, 0.041320),
+        'N2': (1970.7, 131.45, 4.1390, 0.052106),
+        'KR': (2032.7, 127.55, 3.7621, 0.045236),
+        'N2O': (2055.6, 137.11, 4.3173, 0.054350),
+        'RN': (3146.1, 210.48, 6.4486, 0.079135),
+        'SF6': (3255.3, 217.13, 6.8370, 0.086070),
+        'CCL2': (3422.7, 228.30, 7.1886, 0.090496),
+        'CCL3': (3723.7, 248.37, 7.8208, 0.098455)
+    }
+
+    if g_up in A_dict.keys():
+        A = A_dict[g_up]
+    else:
+        raise ValueError(f"gas {g_up} does not match one of {W92_LIST}")
+
+    Sc = A[0] - A[1]*pt + A[2]*pt**2 - A[3]*pt**3
+    return Sc
+
+@match_args_return
+def air_side_Schmidt_number(air_temperature, air_density, gas=None, calculate=True):
+    """
+    Calculate the air-side Schmidt number for nitrous oxide (N2O).
 
     Parameters:
         air_temperature (float): Air temperature in degrees Celsius.
@@ -224,15 +329,15 @@ def air_side_Schmidt_number(air_temperature, pressure, rh=1.0, gas=None, calcula
         # Convert air temperature to Kelvin
         T = air_temperature + 273.15
         # Constants for N2O
-        molecular_diffusivity = diffusivities[gas]*1e-4 * units('m2/s')  # convert from cm^2/s to m2/s
+        molecular_diffusivity = diffusivities[gas]*1e-4  # convert from cm^2/s to m2/s
         # Calculate air-side Schmidt number
-        mu_a, nu_a = kinematic_viscosity_air(air_temperature, pressure, rh)
-        ScA = nu_a / molecular_diffusivity
+        mu_a, nu_a = kinematic_viscosity_air(air_temperature, air_density)  # kg/m/s, m2/s
+        ScA = nu_a / molecular_diffusivity # dimensionless
     # or look up an empirical value
     elif (gas in schmidt_dict.keys())&(calculate==False):
-        ScA = schmidt_dict[gas] * units('dimensionless')
+        ScA = schmidt_dict[gas]
     # or just use default value of 0.9 for all other cases
     else:
-        ScA = 0.9 * units('dimensionless')
+        ScA = 0.9
     
     return ScA
