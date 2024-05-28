@@ -6,9 +6,12 @@ Created on Mon Nov 20 14:55:36 2017
 @author: dnicholson
 """
 import numpy as np
-from gasex.phys import vpress_sw, R, cdlp81, atm2pa, K0
-from gasex.diff import schmidt,diff
+from metpy.calc import density # use metpy to calculate air density for air-side Schmidt
+from metpy.units import units
+from gasex.phys import vpress_sw, R, cdlp81, atm2pa, K0, xH2O_from_rh
+from gasex.diff import schmidt,diff,air_side_Schmidt_number
 from gasex.sol import sol_SP_pt,eq_SP_pt, air_mol_fract
+from gasex.patm import patm
 from gsw import rho, CT_from_pt
 from ._utilities import match_args_return
 
@@ -147,7 +150,7 @@ def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
     return Fd
 
 @match_args_return
-def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
+def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None, calculate_Sca=True, schmidtcalc=None):
     """
     % fas_L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
@@ -236,89 +239,119 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):
     # -------------------------------------------------------------------------
 
     # if humidity is not provided, set to 1 for all values
-    ph2oveq = vpress_sw(SP,pt)
-    ph2ov = rh * ph2oveq
+    ph2oveq = vpress_sw(SP,pt) # atm
+    ph2ov = rh * ph2oveq # atm
 
     # slpc = (observed dry air pressure)/(reference dry air pressure)
-    slp_corr = (slp - ph2ov) /(1 - ph2oveq)
+    slp_corr = (slp - ph2ov) /(1 - ph2oveq) # dimensionless
 
+    # -------------------------------------------------------------------------
+    # Calculate air density and Schmidt number if air temperature is not None
+    # -------------------------------------------------------------------------
+    if air_temperature is not None:
+        # Convert air temperature to Kelvin
+        T = (air_temperature + K0) # K
+
+        # calculate mixing ratio of water vapor in air
+        #xH2O = mixing_ratio_from_relative_humidity(slp * units.atm, air_temperature * units.degC, rh).to('g/kg') # g/kg
+        xH2O = xH2O_from_rh(SP,pt,slp=slp,rh=rh)
+
+        # Calculate density of air
+        rhoa = density(np.array(slp) * units.atm, np.array(air_temperature) * units.degC, np.array(xH2O) * units('g/kg')) # kg/m3
+        # drop metpy units for computational efficiency
+        rhoa = rhoa.magnitude
+
+        # air-side schmidt number, dimensionless
+        ScA = air_side_Schmidt_number(air_temperature, rhoa, gas=gas, calculate=calculate_Sca)
+
+    else:
+        rhoa = 1.225 # default density of air, kg/m3
+        ScA = 0.9 # default air Schmidt number, dimensionless
     # -------------------------------------------------------------------------
     # Parameters for COARE 3.0 calculation - diffusive gas exchange
     # -------------------------------------------------------------------------
 
     # Calculate potential density at surface
-    SA = SP * 35.16504 / 35
-    CT = CT_from_pt(SA,pt)
-    rhow = rho(SA,CT,0*CT) # density of water
-    rhoa = 1.225 # density of air
+    SA = SP * 35.16504 / 35 # absolute salinity, psu
+    CT = CT_from_pt(SA,pt) # conservative temperature, degrees C
+    rhow = rho(SA,CT,0*CT) # density of water, kg/m3
 
-    lam = 13.3 # numerator in Fairall et al., 2011 eqn. (14)
+    lam = 13.3 # numerator in Fairall et al., 2011 eqn. (14). Not sure about units but Lam/A/phi is dimensionless
     A = 1.3 # constant, determined empirically by Fairall et al. (2011)
     phi = 1 # buoyancy term. Except for light wind cases, phi=1 (Fairall et al., 2011)
-    tkt = 0.01 # molecular sublayer thickness, ~1 mm (Fairall et al., 2011)
+    tkt = 0.01 # molecular sublayer thickness, ~1 mm (Fairall et al., 2011), units in meters
     hw = lam /A / phi # eqn. 14 of Fairall et al., 2011
-    ha = lam
-
-    # air-side schmidt number
-    ScA = 0.9
+    ha = lam # defined as 13.3 in Fairall et al., 2011
+    zw = 0.5 # units in meters
+    za = 1.0 # atmospheric measurement height
+    kappa = 0.4 # defined as 0.4 in Fairall et al., 2011
 
     # -------------------------------------------------------------------------
     # Calculate gas physical properties
     # -------------------------------------------------------------------------
 
-    if chi_atm == None:
-        xG = air_mol_fract(gas=gas)
-        Geq = eq_SP_pt(SP,pt,gas=gas,units="mM")
+    if chi_atm is None:
+        xG = air_mol_fract(gas=gas) # mol gas/mol dry air
     else:
         xG = chi_atm
-        Geq = xG * sol_SP_pt(SP,pt,gas=gas,units="mM")
+    k0 = sol_SP_pt(SP,pt,gas=gas,slp=slp,rh=rh,chi_atm=xG, units="mM")
+    f = patm(SP,pt,gas=gas,slp=slp,rh=rh,chi_atm=xG,units="atm")
+    Geq = k0*f
 
-    alc = (Geq / atm2pa) * R * (pt+K0)
+    T = pt + 273.15 # K
+    alc0 = (Geq / atm2pa) * R * (pt+K0) # original: I think this assumes the barometric pressure is 1 atm?
+    alc = (Geq / (slp * atm2pa)) * R * T # dividing by slp makes alc dimensionless
 
-    Gsat = C / Geq
-    ScW = schmidt(SP,pt,gas=gas)
+    Gsat = C / Geq # dimensionless
+    ScW = schmidt(SP,pt,gas=gas,schmidtcalc=schmidtcalc) # dimensionless
 
     # -------------------------------------------------------------------------
     # Calculate COARE 3.0 and gas transfer velocities
     # -------------------------------------------------------------------------
     # ustar
     # eqns. 12 and 13 of Liang et al., 2013
-    cd10 = cdlp81(u10)
-    ustar = u10 * np.sqrt(cd10) # shouldn't this actually be u10*np.sqrt(rhoa*cd10/rhow)?
-
+    cd10 = cdlp81(u10) # dimensionless?
+    ustar = u10 * np.sqrt(cd10) # m/s. using u10*np.sqrt(rhoa*cd10/rhow) (L13 equation 12) throws everything off
+    
     # water-side ustar
-    ustarw = ustar / np.sqrt(rhow / rhoa)
+    ustarw = ustar / np.sqrt(rhow / rhoa) # m/s
 
-    # water-side resistance to transfer
+    # water-side resistance to transfer, dimensionless
     # eqn. 13 of Fairall et al., 2011
-    rwt = np.sqrt(rhow / rhoa) * (hw * np.sqrt(ScW)+(np.log(0.5 / tkt) /0.4)) # Fairall et al. 2011 define k as 0.4
+    rwt = np.sqrt(rhow / rhoa) * (hw * np.sqrt(ScW)+(np.log(zw / tkt) / kappa)) # Fairall et al. 2011 define k as 0.4
 
-    # air-side resistance to transfer
+    # air-side resistance to transfer, dimensionless
     # eqn. 15 of Fairall et al., 2011
-    rat = ha * np.sqrt(ScA) + 1 / np.sqrt(cd10) - 5 + 0.5 * np.log(ScA) /0.4
+    rat = ha * np.sqrt(ScA) + za / np.sqrt(cd10) - 5 + 0.5 * np.log(ScA) / kappa
 
     # diffusive gas transfer coefficient (L13 eqn 9/Fairall 2011 eqn. 11)
-    Ks = ustar / (rwt + rat * alc)
+    Ks = ustar / (rwt + rat * alc) # m/s
 
     # bubble transfer velocity (L13 eqn 14)
-    Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s)
+    Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s) # m/s
+    
+    Kt = Ks + Kb
 
     # overpressure dependence on windspeed (L13 eqn 16)
-    dP = 1.5244 * ustarw**1.06
+    # dP = supersaturation at which air-sea flux due to partially dissolved bubbles = 0
+    dP = 1.5244 * ustarw**1.06 # percentage
 
     # -------------------------------------------------------------------------
     # Calculate air-sea fluxes
     # -------------------------------------------------------------------------
 
-    Fd = Ks * Geq * (slp_corr - Gsat) # Fs in L13 eqn 3
-    Fp = Kb * Geq * ((1+dP) * slp_corr - Gsat) # Fp in L13 eqn 3
-    Fc = xG * 5.56 * ustarw ** 3.86 # L13 eqn 15
+    Fd = Ks * Geq * (slp_corr - Gsat) # Fs in L13 eqn 3, units are mol/m2/s
+    Fp = Kb * Geq * ((1+dP) * slp_corr - Gsat) # Fp in L13 eqn 3, units are mol/m2/s
+    Fc = xG * 5.56 * ustarw ** 3.86 # L13 eqn 15, units are mol/m2/s
 
     # -------------------------------------------------------------------------
     # Calculate steady-state supersaturation
     # -------------------------------------------------------------------------
     # L13 eqn 5
-    Deq = (Kb * Geq * dP * slp_corr + Fc) / ((Kb + Ks) * Geq * slp_corr)
+    # Deq = supersaturation at which the total gas flux between ocean and atmosphere = 0
+    # bubble-mediated flux into the ocean is balanced by diffusive flux out of the ocean
+    Deq = (Kb * Geq * dP * slp_corr + Fc) / ((Kb + Ks) * Geq * slp_corr) # percentage
+
     return (Fd,Fc,Fp,Deq,Ks)
 
 @match_args_return
