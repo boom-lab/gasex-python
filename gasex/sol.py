@@ -14,6 +14,7 @@ from gsw import pt_from_CT,SP_from_SA,CT_from_pt,rho
 from ._utilities import match_args_return
 from gasex.phys import K0 as K0
 from gasex.phys import vpress_sw, R
+from gasex.fugacity import fugacity_factor
 
 
 __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
@@ -23,7 +24,7 @@ __all__ = ['O2sol_SP_pt','Hesol_SP_pt','Nesol_SP_pt','Arsol_SP_pt', \
 
 
 @match_args_return
-def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
+def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
     """
     Description:
     -----------
@@ -49,11 +50,21 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
     AUTHOR: David Nicholson
     -----------
     """
+    g_up = gas.upper()
+    vp_sw = vpress_sw(SP,pt)
+    SA = SP * 35.16504/35
+    CT = CT_from_pt(SA,pt)
+    dens = rho(SA,CT,0*CT)
+
+    if chi_atm is None:
+        chi_atm = air_mol_fract(gas=gas)
+    
     if slp != 1.0:
-        vp_sw = vpress_sw(SP,pt)
         p_corr = (slp - vp_sw) / (1 - vp_sw)
     else:
          p_corr = 1
+
+    f  = fugacity_factor(pt,gas=gas,slp=slp)
 
     if gas == 'O2':
         soleq = O2sol_SP_pt(SP,pt)
@@ -69,20 +80,35 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM"):
         soleq = Xesol_SP_pt(SP,pt)
     elif gas == 'N2':
         soleq = N2sol_SP_pt(SP,pt)
+    elif gas == 'N2O':
+        k = N2Osol_SP_pt(SP,pt)
+        soleq = k*chi_atm*(1 - vp_sw) # mol/L
+        soleq = soleq/dens*1000*1e6 # convert to umol/kg
+    elif gas == 'CO2':
+        k = CO2sol_SP_pt(SP,pt)
+        soleq = k*chi_atm*(1 - vp_sw) # mol/L
+        soleq = soleq/dens*1000*1e6 # convert to umol/kg
+    elif gas == 'CH4':
+        k = CH4sol_SP_pt(SP,pt)
+        soleq = k*chi_atm*(1 - vp_sw) # mol/L
+        soleq = soleq/dens*1000*1e6 # convert to umol/kg
     else:
         raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe or \
                          N2")
-    if units not in ("M","mM","uM","molm3","umolkg"):
+
+    if units not in ("M","mM","uM","nM","molm3","umolkg"):
         raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
-    SA = SP * 35.16504/35
-    CT = CT_from_pt(SA,pt)
-    dens = rho(SA,CT,0*CT)
+
+    soleq = soleq*f # apply fugacity factor
+
     if units == "M":
         eq =  p_corr * dens * soleq / 1e9
     elif units =="mM" or units =="molm3":
         eq =  p_corr * dens * soleq / 1e6
     elif units =="uM":
         eq =  p_corr * dens * soleq / 1e3
+    elif units == "nM":
+        eq =  p_corr * dens * soleq
     elif units == 'umolkg':
         eq =  p_corr * soleq
     return eq
@@ -1057,19 +1083,17 @@ def air_mol_fract(gas=None):
         xG: molar atmospheric mixing ratio for well-lixed gases ('O2','HE','NE','AR','KR','XE' or 'N2')
     """
     g_up = gas.upper()
-    if g_up in ['O2','HE','NE','AR','KR','XE','N2','N2O']:
+    if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
         frac_dict = {'O2':np.array([0.209790]), \
                  'HE':np.array([5.24e-6]), \
                  'NE':np.array([0.00001818]), \
                  'AR':np.array([0.009332]), \
                  'KR':np.array([0.00000114]), \
                  'XE':np.array([8.7e-8]), \
-                 'N2':np.array([0.780848]), \
-                 'N2O':np.array([338e-9]) }
+                 'N2':np.array([0.780848]) }
+        return frac_dict[g_up]
     else:
-        raise ValueError(gas + " is supported. Must be O2,He,Ne,Ar,Kr,Xe,N2, or \
-                         N2O")
-    return frac_dict[g_up]
+        raise ValueError(f"must specify chi_atm for {g_up}. Default chi_atm only available for O2, He, Ne, Ar, Kr, Xe, and N2.")  
 
 def mol_vol(gas=None):
     g_up = gas.upper()

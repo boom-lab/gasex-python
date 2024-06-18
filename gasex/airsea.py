@@ -11,7 +11,7 @@ from metpy.units import units
 from gasex.phys import vpress_sw, R, cdlp81, atm2pa, K0, xH2O_from_rh
 from gasex.diff import schmidt,diff,air_side_Schmidt_number
 from gasex.sol import sol_SP_pt,eq_SP_pt, air_mol_fract
-from gasex.patm import patm
+from gasex.fugacity import fugacity_factor
 from gsw import rho, CT_from_pt
 from ._utilities import match_args_return
 
@@ -150,7 +150,8 @@ def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
     return Fd
 
 @match_args_return
-def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None, calculate_Sca=True, schmidtcalc=None):
+def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None,
+        calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None):
     """
     % fas_L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
@@ -233,7 +234,8 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # -------------------------------------------------------------------------
     m2cm = 100 # cm in a meter
     h2s = 3600 # sec in hour
-
+    atm2pa = 101325.0 # Pa per atm, Pa/atm, 1 Pa = kg/m/s2
+    R = 8.3144598 # ideal gas constant, J/(mol K), 1 J = kg*m2/s2
     # -------------------------------------------------------------------------
     # Calculate water vapor pressure and adjust sea level pressure
     # -------------------------------------------------------------------------
@@ -257,12 +259,13 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         xH2O = xH2O_from_rh(SP,pt,slp=slp,rh=rh)
 
         # Calculate density of air
+        # using "units" might be a performance bottleneck
         rhoa = density(np.array(slp) * units.atm, np.array(air_temperature) * units.degC, np.array(xH2O) * units('g/kg')) # kg/m3
         # drop metpy units for computational efficiency
         rhoa = rhoa.magnitude
 
         # air-side schmidt number, dimensionless
-        ScA = air_side_Schmidt_number(air_temperature, rhoa, gas=gas, calculate=calculate_Sca)
+        ScA = air_side_Schmidt_number(air_temperature, rhoa, gas=gas, calculate=calculate_schmidtair)
 
     else:
         rhoa = 1.225 # default density of air, kg/m3
@@ -291,19 +294,20 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # -------------------------------------------------------------------------
 
     if chi_atm is None:
-        xG = air_mol_fract(gas=gas) # mol gas/mol dry air
+        xG = air_mol_fract(gas=gas)
+        Geq = eq_SP_pt(SP,pt,gas=gas,slp=slp,units="mM")
     else:
         xG = chi_atm
-    k0 = sol_SP_pt(SP,pt,gas=gas,slp=slp,rh=rh,chi_atm=xG, units="mM")
-    f = patm(SP,pt,gas=gas,slp=slp,rh=rh,chi_atm=xG,units="atm")
-    Geq = k0*f
+        f  = fugacity_factor(pt,gas=gas,slp=slp)
+        s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
+        Geq = xG * f * (slp - ph2ov) * s
 
     T = pt + 273.15 # K
     alc0 = (Geq / atm2pa) * R * (pt+K0) # original: I think this assumes the barometric pressure is 1 atm?
     alc = (Geq / (slp * atm2pa)) * R * T # dividing by slp makes alc dimensionless
 
     Gsat = C / Geq # dimensionless
-    ScW = schmidt(SP,pt,gas=gas,schmidtcalc=schmidtcalc) # dimensionless
+    ScW = schmidt(SP,pt,gas=gas,schmidt_parameterization=schmidt_parameterization) # dimensionless
 
     # -------------------------------------------------------------------------
     # Calculate COARE 3.0 and gas transfer velocities
@@ -352,7 +356,32 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # bubble-mediated flux into the ocean is balanced by diffusive flux out of the ocean
     Deq = (Kb * Geq * dP * slp_corr + Fc) / ((Kb + Ks) * Geq * slp_corr) # percentage
 
-    return (Fd,Fc,Fp,Deq,Ks)
+    # -------------------------------------------------------------------------
+    # define which variables get returned
+    # -------------------------------------------------------------------------
+    if return_vars is None:
+        return_vars = ['Fd', 'Fc', 'Fp', 'Deq', 'Ks']
+    elif isinstance(return_vars, tuple):
+        return_vars = [elem for elem in return_vars]
+    elif isinstance(return_vars, str):
+        return_vars = [return_vars]
+    
+    # Dictionary of all variables
+    all_vars = {
+        'Fd': Fd,
+        'Fc': Fc,
+        'Fp': Fp,
+        'Deq': Deq,
+        'Ks': Ks,
+        'Kt': Kt,
+        'ScW': ScW,
+        'Geq': Geq,
+        'Kb': Kb,
+        'ustar': ustar
+    }
+
+    # Return only the requested variables
+    return tuple(all_vars[var] for var in return_vars)
 
 @match_args_return
 def N16(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None):

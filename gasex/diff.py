@@ -126,14 +126,14 @@ def diff(SP,pt,*,gas=None):
 
 
 @match_args_return
-def schmidt(SP,pt,*,gas=None, schmidtcalc=None):
+def schmidt(SP,pt,*,gas=None, schmidt_parameterization=None):
     """
     Calculate water-side Schmidt number from salinity and potential temperature.
     Parameters:
         SP (array-like): Practical salinity
         pt (array-like): potential temperature in degrees Celsius
         gas (string): 'NE', 'CFC11', 'HE', 'CH4', 'SF6', 'XE', 'CCL2', 'CO2', 'CFC12', 'DMS', 'AR', 'RN', 'CCL4', 'KR', 'O2', 'N2', 'CCL3', 'CH3BR', or 'N2O'
-        schmidtcalc (string): 'viscdiff', 'W14', or 'W92' (Default: viscdiff if available for that gas,
+        schmidt_parameterization (string): 'viscdiff', 'W14', or 'W92' (Default: viscdiff if available for that gas,
         then W14 if visdiff is not available, then W92 if viscdiff and W14 are not available.)
 
     Returns:
@@ -145,7 +145,7 @@ def schmidt(SP,pt,*,gas=None, schmidtcalc=None):
     
     g_up = gas.upper()
     
-    if schmidtcalc is None:
+    if schmidt_parameterization is None:
         try:
             if g_up in GAS_LIST:
                 return visc(SP, pt) / diff(SP, pt, gas=gas)
@@ -162,22 +162,22 @@ def schmidt(SP,pt,*,gas=None, schmidtcalc=None):
         if g_up not in GAS_LIST and g_up not in W14_LIST and g_up not in W92_LIST:
             raise ValueError(f"gas {g_up} does not match one of {set(GAS_LIST + W14_LIST + W92_LIST)}")
         
-        if g_up in GAS_LIST and schmidtcalc == "viscdiff":
+        if g_up in GAS_LIST and schmidt_parameterization == "viscdiff":
             return visc(SP, pt) / diff(SP, pt, gas=gas)
         
-        if g_up in W14_LIST and schmidtcalc == "W14":
+        if g_up in W14_LIST and schmidt_parameterization == "W14":
             return schmidt_W14(pt, gas=gas, sw=True)
         
-        if g_up in W92_LIST and schmidtcalc == "W92":
+        if g_up in W92_LIST and schmidt_parameterization == "W92":
             return schmidt_W92(pt, gas=gas, sw=True)
         
-        if schmidtcalc == "viscdiff":
+        if schmidt_parameterization == "viscdiff":
             return visc(SP, pt) / diff(SP, pt, gas=gas)
         
-        if schmidtcalc == "W14":
+        if schmidt_parameterization == "W14":
             return schmidt_W14(pt, gas=gas, sw=True)
         
-        if schmidtcalc == "W92":
+        if schmidt_parameterization == "W92":
             return schmidt_W92(pt, gas=gas, sw=True)
 
 @match_args_return
