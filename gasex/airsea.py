@@ -330,10 +330,12 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     rat = ha * np.sqrt(ScA) + za / np.sqrt(cd10) - 5 + 0.5 * np.log(ScA) / kappa
 
     # diffusive gas transfer coefficient (L13 eqn 9/Fairall 2011 eqn. 11)
-    Ks = ustar / (rwt + rat * alc) # m/s
+    if Ks is None:
+        Ks = ustar / (rwt + rat * alc) # m/s
 
     # bubble transfer velocity (L13 eqn 14)
-    Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s) # m/s
+    if Kb is None:
+        Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s) # m/s
     
     Kt = Ks + Kb
 

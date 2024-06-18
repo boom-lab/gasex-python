@@ -120,10 +120,10 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
 def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,slp=1.0,rh=1.0,chi_atm=None,units="mM"):
     g_up = gas.upper()
     vp_sw = vpress_sw(SP,pt)*rh
-    if chi_atm is None:
-        chi_atm = air_mol_fract(gas=gas)
 
     if g_up in ['O2','HE','NE','AR','KR','XE','N2']:
+        if chi_atm is None:
+            chi_atm = air_mol_fract(gas=gas)
         # solubility for 1 atm dry gas (K0)
         K0 = eq_SP_pt(SP,pt,gas=gas,units="M") / (chi_atm * (slp-vp_sw))
     elif gas == 'N2O':
