@@ -6,9 +6,9 @@ Created on Mon Nov 20 14:55:36 2017
 @author: dnicholson
 """
 import numpy as np
-from metpy.calc import density # use metpy to calculate air density for air-side Schmidt
-from metpy.units import units
-from gasex.phys import vpress_sw, R, cdlp81, atm2pa, K0, xH2O_from_rh
+#from metpy.calc import density # use metpy to calculate air density for air-side Schmidt
+#from metpy.units import units
+from gasex.phys import vpress_sw, R, cdlp81, atm2pa, K0, xH2O_from_rh, calculate_air_density
 from gasex.diff import schmidt,diff,air_side_Schmidt_number
 from gasex.sol import sol_SP_pt,eq_SP_pt, air_mol_fract
 from gasex.fugacity import fugacity_factor
@@ -151,7 +151,8 @@ def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
 
 @match_args_return
 def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None,
-        calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None):
+        calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None,
+        Ks = None, Kb=None, Fc=None):
     """
     % fas_L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
@@ -255,14 +256,14 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         T = (air_temperature + K0) # K
 
         # calculate mixing ratio of water vapor in air
-        #xH2O = mixing_ratio_from_relative_humidity(slp * units.atm, air_temperature * units.degC, rh).to('g/kg') # g/kg
         xH2O = xH2O_from_rh(SP,pt,slp=slp,rh=rh)
 
         # Calculate density of air
         # using "units" might be a performance bottleneck
-        rhoa = density(np.array(slp) * units.atm, np.array(air_temperature) * units.degC, np.array(xH2O) * units('g/kg')) # kg/m3
+        #rhoa = density(np.array(slp) * units.atm, np.array(air_temperature) * units.degC, np.array(xH2O) * units('g/kg')) # kg/m3
         # drop metpy units for computational efficiency
-        rhoa = rhoa.magnitude
+        #rhoa = rhoa.magnitude
+        rhoa = calculate_air_density(air_temperature, slp, xH2O)
 
         # air-side schmidt number, dimensionless
         ScA = air_side_Schmidt_number(air_temperature, rhoa, gas=gas, calculate=calculate_schmidtair)
@@ -295,7 +296,7 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
 
     if chi_atm is None:
         xG = air_mol_fract(gas=gas)
-        Geq = eq_SP_pt(SP,pt,gas=gas,slp=slp,units="mM")
+        Geq = eq_SP_pt(SP,pt,gas=gas,slp=slp,units="mM") # eq_SP_pt applies fugacity within the function
     else:
         xG = chi_atm
         f  = fugacity_factor(pt,gas=gas,slp=slp)

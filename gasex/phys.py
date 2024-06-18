@@ -235,6 +235,27 @@ def rh_from_dewpoint_t2m(t2m, dewpoint):
     
     return rh
 
+@match_args_return
+def calculate_air_density(temp_c, pressure_atm, mixing_ratio_g_kg):
+    # Constants
+    R_d = 287.058  # J/(kg·K) for dry air
+    R_v = 461.495  # J/(kg·K) for water vapor
+    epsilon = R_d / R_v
+
+    # Convert input values to appropriate units
+    T = temp_c + 273.15  # Convert temperature to Kelvin
+    pressure_pa = pressure_atm * 101325  # Convert pressure to Pascals
+    mixing_ratio = mixing_ratio_g_kg / 1000  # Convert mixing ratio to kg/kg
+
+    # Calculate the partial pressures
+    p_v = (mixing_ratio / (mixing_ratio + epsilon)) * pressure_pa
+    p_d = pressure_pa - p_v
+
+    # Calculate air density
+    air_density = (p_d / (R_d * T)) + (p_v / (R_v * T))
+
+    return air_density
+
 #@match_args_return
 #def vpress_sw(SP,pt):
 #    """
