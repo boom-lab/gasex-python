@@ -152,7 +152,7 @@ def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
 @match_args_return
 def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None,
         calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None,
-        Ks = None, Kb=None, Fc=None):
+        Ks = None, Kb=None, Kc=None, dP=None, pressure_mode=False):
     """
     % fas_L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
@@ -175,7 +175,8 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     % 894?905, doi:10.1002/gbc.20080.
     %
     % INPUTS:------------------------------------------------------------------
-    % C:    gas concentration (mol m-3)
+    % C:    gas concentration (mol m-3) if pressure_mode is False;
+    %       Psw - Patm (atm) if pressure_mode is True
     % u10:  10 m wind speed (m/s)
     % SP:   Sea surface salinity (PSS)
     % pt:   Sea surface temperature (deg C)
@@ -296,29 +297,37 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
 
     if chi_atm is None:
         xG = air_mol_fract(gas=gas)
+        s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
         Geq = eq_SP_pt(SP,pt,gas=gas,slp=slp,units="mM") # eq_SP_pt applies fugacity within the function
+        Patm = Geq / s
     else:
         xG = chi_atm
         f  = fugacity_factor(pt,gas=gas,slp=slp)
         s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
-        Geq = xG * f * (slp - ph2ov) * s
+        Patm = xG * f * (slp - ph2ov)
+        Geq = Patm * s
 
     T = pt + 273.15 # K
     alc0 = (Geq / atm2pa) * R * (pt+K0) # original: I think this assumes the barometric pressure is 1 atm?
     alc = (Geq / (slp * atm2pa)) * R * T # dividing by slp makes alc dimensionless
 
-    Gsat = C / Geq # dimensionless
+    if pressure_mode is True:
+        # if pressure_mode is True "C" is Psw - Patm
+        Psw = C# + Patm
+        Gsat = Psw / Patm
+    else:
+        Gsat = C / Geq # dimensionless
+
     ScW = schmidt(SP,pt,gas=gas,schmidt_parameterization=schmidt_parameterization) # dimensionless
 
     # -------------------------------------------------------------------------
     # Calculate COARE 3.0 and gas transfer velocities
     # -------------------------------------------------------------------------
     # ustar
-    # eqns. 12 and 13 of Liang et al., 2013
-    cd10 = cdlp81(u10) # dimensionless?
-    ustar = u10 * np.sqrt(cd10) # m/s. using u10*np.sqrt(rhoa*cd10/rhow) (L13 equation 12) throws everything off
+    cd10 = cdlp81(u10) # L13 eqn. 13
+    ustar = u10 * np.sqrt(cd10)
     
-    # water-side ustar
+    # water-side ustar - L13 eqn. 12
     ustarw = ustar / np.sqrt(rhow / rhoa) # m/s
 
     # water-side resistance to transfer, dimensionless
@@ -336,12 +345,14 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # bubble transfer velocity (L13 eqn 14)
     if Kb is None:
         Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s) # m/s
-    
-    Kt = Ks + Kb
+
+    # small bubble transfer coefficient (L13 eqn 15)
+    if Kc is None:
+        Kc = 5.56 * ustarw ** 3.86 # mol/m2/s
 
     # overpressure dependence on windspeed (L13 eqn 16)
-    # dP = supersaturation at which air-sea flux due to partially dissolved bubbles = 0
-    dP = 1.5244 * ustarw**1.06 # percentage
+    if dP is None:
+        dP = 1.5244 * ustarw**1.06 # units are %
 
     # -------------------------------------------------------------------------
     # Calculate air-sea fluxes
@@ -349,15 +360,12 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
 
     Fd = Ks * Geq * (slp_corr - Gsat) # Fs in L13 eqn 3, units are mol/m2/s
     Fp = Kb * Geq * ((1+dP) * slp_corr - Gsat) # Fp in L13 eqn 3, units are mol/m2/s
-    Fc = xG * 5.56 * ustarw ** 3.86 # L13 eqn 15, units are mol/m2/s
+    Fc = xG * Kc # L13 eqn 15, units are mol/m2/s
 
     # -------------------------------------------------------------------------
     # Calculate steady-state supersaturation
     # -------------------------------------------------------------------------
-    # L13 eqn 5
-    # Deq = supersaturation at which the total gas flux between ocean and atmosphere = 0
-    # bubble-mediated flux into the ocean is balanced by diffusive flux out of the ocean
-    Deq = (Kb * Geq * dP * slp_corr + Fc) / ((Kb + Ks) * Geq * slp_corr) # percentage
+    Deq = (Kb * Geq * dP * slp_corr + Fc) / ((Kb + Ks) * Geq * slp_corr) # L13 eqn 5, units are percentage
 
     # -------------------------------------------------------------------------
     # define which variables get returned
@@ -376,11 +384,14 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         'Fp': Fp,
         'Deq': Deq,
         'Ks': Ks,
-        'Kt': Kt,
+        'Kb': Kb,
+        'Kc': Kc,
+        'dP': dP,
         'ScW': ScW,
         'Geq': Geq,
-        'Kb': Kb,
-        'ustar': ustar
+        'ustarw': ustarw,
+        'rwt': rwt,
+        'rat': rat
     }
 
     # Return only the requested variables
