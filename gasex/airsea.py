@@ -82,7 +82,7 @@ def kgas(u10,Sc,*,param="W14"):
 
 
 
-def fsa(C,u10,SP,T,*,slp=1.0,gas=None,param="W14",rh=1):
+def fsa(C,u10,SP,T,*,slp=1.0,gas=None,param="W14",rh=1,chi_atm=None):
     """
     DESCRIPTION
     -------------
@@ -109,14 +109,14 @@ def fsa(C,u10,SP,T,*,slp=1.0,gas=None,param="W14",rh=1):
     """
     slp_corr = (slp - vpress_sw(SP,T)) / (1 - vpress_sw(SP,T))
     # equilibrium conc. [mol L-1 == mmol m-3]
-    C_eq = eq_SP_pt(SP,T,gas=gas)
+    C_eq = eq_SP_pt(SP,T,gas=gas,slp=slp,chi_atm=chi_atm)
     Sc = schmidt(SP,T,gas=gas)
     # piston velocity [m s-1]
-    k = kgas(u10,Sc,param)
-    Fd = k * (C - C_eq * slp_corr)
+    k = kgas(u10,Sc,param=param)
+    Fd = k * (C - C_eq) # don't need slp_corr because it's now built into eq_SP_pt function * slp_corr)
     return Fd
 
-def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
+def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14",chi_atm=None):
     """
     DESCRIPTION
     -------------
@@ -141,18 +141,18 @@ def fsa_pC(pC_w,pC_a,u10,SP,T,*,gas=None,param="W14"):
     """
 
     # K0 in mmol L-1 atm-1 == mol m-3 atm-1
-    K0 = sol_SP_pt(SP,T,gas=gas,units="mM")
+    s = sol_SP_pt(SP,T,chi_atm=chi_atm, gas=gas,units="mM")
     Sc = schmidt(SP,T,gas=gas)
     # piston velocity m s-1
-    k = kgas(u10,Sc,param)
+    k = kgas(u10,Sc,param=param)
     # m s-1 * mol m-3 atm -1 * atm == mol m-2 s-1
-    Fd = k * K0 * (pC_w - pC_a) / 1e6
+    Fd = k * s * (pC_w - pC_a) / 1e6
     return Fd
 
 @match_args_return
 def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None,
         calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None,
-        Ks = None, Kb=None, Kc=None, dP=None, pressure_mode=False):
+        Ks = None, Kb=None, Kc=None, dP=None, beta=1.0, pressure_mode=False):
     """
     % fas_L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
@@ -260,10 +260,6 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         xH2O = xH2O_from_rh(SP,pt,slp=slp,rh=rh)
 
         # Calculate density of air
-        # using "units" might be a performance bottleneck
-        #rhoa = density(np.array(slp) * units.atm, np.array(air_temperature) * units.degC, np.array(xH2O) * units('g/kg')) # kg/m3
-        # drop metpy units for computational efficiency
-        #rhoa = rhoa.magnitude
         rhoa = calculate_air_density(air_temperature, slp, xH2O)
 
         # air-side schmidt number, dimensionless
@@ -281,20 +277,12 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     CT = CT_from_pt(SA,pt) # conservative temperature, degrees C
     rhow = rho(SA,CT,0*CT) # density of water, kg/m3
 
-    lam = 13.3 # numerator in Fairall et al., 2011 eqn. (14). Not sure about units but Lam/A/phi is dimensionless
-    A = 1.3 # constant, determined empirically by Fairall et al. (2011)
-    phi = 1 # buoyancy term. Except for light wind cases, phi=1 (Fairall et al., 2011)
-    tkt = 0.01 # molecular sublayer thickness, ~1 mm (Fairall et al., 2011), units in meters
-    hw = lam /A / phi # eqn. 14 of Fairall et al., 2011
-    ha = lam # defined as 13.3 in Fairall et al., 2011
-    zw = 0.5 # units in meters
-    za = 1.0 # atmospheric measurement height
-    kappa = 0.4 # defined as 0.4 in Fairall et al., 2011
+    # Constants for COARE 3.0 calculation
+    lam, A, phi, tkt, hw, ha, zw, za, kappa = 13.3, 1.3, 1, 0.01, 13.3/1.3, 13.3, 0.5, 1.0, 0.4
 
     # -------------------------------------------------------------------------
     # Calculate gas physical properties
     # -------------------------------------------------------------------------
-
     if chi_atm is None:
         xG = air_mol_fract(gas=gas)
         s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
@@ -308,12 +296,11 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         Geq = Patm * s
 
     T = pt + 273.15 # K
-    alc0 = (Geq / atm2pa) * R * (pt+K0) # original: I think this assumes the barometric pressure is 1 atm?
     alc = (Geq / (slp * atm2pa)) * R * T # dividing by slp makes alc dimensionless
 
-    if pressure_mode is True:
+    if pressure_mode:
         # if pressure_mode is True "C" is Psw - Patm
-        Psw = C# + Patm
+        Psw = C
         Gsat = Psw / Patm
     else:
         Gsat = C / Geq # dimensionless
@@ -341,26 +328,23 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # diffusive gas transfer coefficient (L13 eqn 9/Fairall 2011 eqn. 11)
     if Ks is None:
         Ks = ustar / (rwt + rat * alc) # m/s
-
     # bubble transfer velocity (L13 eqn 14)
     if Kb is None:
         Kb = 1.98e6 * ustarw**2.76 * (ScW / 660)**(-2/3) / (m2cm * h2s) # m/s
-
     # small bubble transfer coefficient (L13 eqn 15)
     if Kc is None:
-        Kc = 5.56 * ustarw ** 3.86 # mol/m2/s
-
+        Kc = 5.56 * ustarw**3.86 # mol/m2/s
     # overpressure dependence on windspeed (L13 eqn 16)
     if dP is None:
-        dP = 1.5244 * ustarw**1.06 # units are %
+        dP = 1.5244 * ustarw**1.06 # %
 
     # -------------------------------------------------------------------------
     # Calculate air-sea fluxes
     # -------------------------------------------------------------------------
 
     Fd = Ks * Geq * (slp_corr - Gsat) # Fs in L13 eqn 3, units are mol/m2/s
-    Fp = Kb * Geq * ((1+dP) * slp_corr - Gsat) # Fp in L13 eqn 3, units are mol/m2/s
-    Fc = xG * Kc # L13 eqn 15, units are mol/m2/s
+    Fp = beta * Kb * Geq * ((1+dP) * slp_corr - Gsat) # Fp in L13 eqn 3, units are mol/m2/s
+    Fc = beta * xG * Kc # L13 eqn 15, units are mol/m2/s
 
     # -------------------------------------------------------------------------
     # Calculate steady-state supersaturation
@@ -370,13 +354,13 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # -------------------------------------------------------------------------
     # define which variables get returned
     # -------------------------------------------------------------------------
+    # Return requested variables
     if return_vars is None:
         return_vars = ['Fd', 'Fc', 'Fp', 'Deq', 'Ks']
-    elif isinstance(return_vars, tuple):
-        return_vars = [elem for elem in return_vars]
-    elif isinstance(return_vars, str):
+
+    if isinstance(return_vars, str):
         return_vars = [return_vars]
-    
+
     # Dictionary of all variables
     all_vars = {
         'Fd': Fd,
