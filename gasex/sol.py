@@ -59,10 +59,10 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
     if chi_atm is None:
         chi_atm = air_mol_fract(gas=gas)
     
-    if slp != 1.0:
-        p_corr = (slp - vp_sw) / (1 - vp_sw)
+    if slp is None:
+        p_corr = 1
     else:
-         p_corr = 1
+        p_corr = (slp - vp_sw) / (1 - vp_sw)
 
     f  = fugacity_factor(pt,gas=gas,slp=slp)
 
