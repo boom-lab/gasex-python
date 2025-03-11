@@ -109,7 +109,8 @@ def fsa(C,u10,SP,T,*,slp=1.0,gas=None,param="W14",rh=1,chi_atm=None):
     """
     slp_corr = (slp - vpress_sw(SP,T)) / (1 - vpress_sw(SP,T))
     # equilibrium conc. [mol L-1 == mmol m-3]
-    C_eq = eq_SP_pt(SP,T,gas=gas,slp=slp,chi_atm=chi_atm)
+    f  = fugacity_factor(T,gas=gas,slp=slp)
+    C_eq = f * eq_SP_pt(SP,T,gas=gas,slp=slp,chi_atm=chi_atm) # apply fugacity factor outside of eq_SP_pt
     Sc = schmidt(SP,T,gas=gas)
     # piston velocity [m s-1]
     k = kgas(u10,Sc,param=param)
