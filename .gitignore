@@ -1,3 +1,8 @@
+# code for testing and plotting updates
+figures/*
+test functions.ipynb
+test_gasex.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
