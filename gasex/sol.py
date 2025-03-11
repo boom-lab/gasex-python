@@ -64,8 +64,6 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
     else:
         p_corr = (slp - vp_sw) / (1 - vp_sw)
 
-    f  = fugacity_factor(pt,gas=gas,slp=slp)
-
     if gas == 'O2':
         soleq = O2sol_SP_pt(SP,pt)
     elif gas == 'He':
@@ -98,8 +96,6 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
 
     if units not in ("M","mM","uM","nM","molm3","umolkg"):
         raise ValueError("units: units must be \'M\','uM' or \'umolkg\'")
-
-    soleq = soleq*f # apply fugacity factor
 
     if units == "M":
         eq =  p_corr * dens * soleq / 1e9

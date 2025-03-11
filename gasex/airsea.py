@@ -154,12 +154,12 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None,
         Ks = None, Kb=None, Kc=None, dP=None, beta=1.0, pressure_mode=False):
     """
-    % fas_L13: Function to calculate air-sea fluxes with Liang 2013
+    % L13: Function to calculate air-sea fluxes with Liang 2013
     % parameterization
     %
     % USAGE:-------------------------------------------------------------------
-    % [Fd, Fc, Fp, Deq, k] = fas_L13(C,u10,S,T,slp,gas,rh)
-    % [Fd, Fc, Fp, Deq, k] = fas_L13(0.01410,5,35,10,1,'Ar',0.9)
+    % [Fd, Fc, Fp, Deq, k] = L13(C,u10,S,T,slp,gas,rh)
+    % [Fd, Fc, Fp, Deq, k] = L13(0.01410,5,35,10,1,'Ar',0.9)
     %   >Fd = -5.2641e-09
     %   >Fc = 1.3605e-10
     %   >Fp = -6.0093e-10
@@ -176,7 +176,7 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     %
     % INPUTS:------------------------------------------------------------------
     % C:    gas concentration (mol m-3) if pressure_mode is False;
-    %       Psw - Patm (atm) if pressure_mode is True
+    %       Psw (atm) if pressure_mode is True
     % u10:  10 m wind speed (m/s)
     % SP:   Sea surface salinity (PSS)
     % pt:   Sea surface temperature (deg C)
@@ -200,9 +200,9 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     % OUTPUTS:-----------------------------------------------------------------
     %
     % tuple output: (Fd,Fc,Fp,Deq,k)
-    % Fd:   Surface gas flux                              (mmol m-2 s-1)
-    % Fc:   Flux from fully collapsing small bubbles      (mmol m-2 s-1)
-    % Fp:   Flux from partially collapsing large bubbles  (mmol m-2 s-1)
+    % Fd:   Surface gas flux                              (mol m-2 s-1)
+    % Fc:   Flux from fully collapsing small bubbles      (mol m-2 s-1)
+    % Fp:   Flux from partially collapsing large bubbles  (mol m-2 s-1)
     % Deq:  Equilibrium supersaturation                   (unitless (%sat/100))
     % k:    Diffusive gas transfer velocity               (m s-1)
     %
@@ -285,21 +285,21 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # -------------------------------------------------------------------------
     if chi_atm is None:
         xG = air_mol_fract(gas=gas)
+        f  = fugacity_factor(pt,gas=gas,slp=slp)
         s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
-        Geq = eq_SP_pt(SP,pt,gas=gas,slp=slp,units="mM") # eq_SP_pt applies fugacity within the function
+        Geq = f * eq_SP_pt(SP,pt,slp = 1.0,gas=gas,units="mM") # referenced to 1 atm, we apply pressure correction later
         Patm = Geq / s
     else:
         xG = chi_atm
         f  = fugacity_factor(pt,gas=gas,slp=slp)
         s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
-        Patm = xG * f * (slp - ph2ov)
+        Patm = xG * f  * (1 - ph2oveq) # referenced to 1 atm, we apply pressure correction later
         Geq = Patm * s
 
     T = pt + 273.15 # K
     alc = (Geq / (slp * atm2pa)) * R * T # dividing by slp makes alc dimensionless
 
-    if pressure_mode:
-        # if pressure_mode is True "C" is Psw - Patm
+    if pressure_mode: # allows user to input partial pressure instead of concentration
         Psw = C
         Gsat = Psw / Patm
     else:
