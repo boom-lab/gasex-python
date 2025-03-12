@@ -1,3 +1,16 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mar 11 2025
+
+To run unit tests: from the gasex-python directory, run:
+```bash
+python3 -m unittest discover test
+```
+
+@author: Colette Kelly
+"""
+
 import unittest
 from gasex import airsea
 from gasex.sol import sol_SP_pt

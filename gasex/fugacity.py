@@ -3,10 +3,9 @@
 """
 Created on Tue May 28 2024
 
-Functions for calculating gas atmospheric partial pressure,
-using fugacity when available.
+Functions for calculating gas fugacity and fugacity correction factors.
 
-@author: C. Kelly
+@author: Colette Kelly
 """
 
 import numpy as np
@@ -29,18 +28,23 @@ def fugacity_factor(pt,gas=None,slp=1.0):
 @match_args_return
 def N2Ofugacity_factor(pt,slp=1.0):
     """
+    DESCRIPTION
+    -------------
     Calculate the fugacity of N2O in seawater.
 
-    Parameters:
-    - SP: Practical Salinity  (PSS-78) (unitless)
-    - pt: potential temperature (ITS-90) referenced
-             to one standard atmosphere (0 dbar).
-    - slp: Sea level pressure (atm) (default: 1.0)
-    - xn2o: Mixing ratio of N2O  in dry air (ppb) (default: 333 ppb)
-    - units: Units of fugacity ("natm" for nanonatmospheres, "atm" for atmospheres) (default: "natm")
+    Fugacity accounts for non-ideal gas behavior and is used in air-sea gas exchange calculations.
+    This function implements the Weiss and Price (1980) method for computing the fugacity correction factor.
 
-    Returns:
-    - f: Fugacity of N2O in the specified units
+    INPUTS:
+    ----------
+    pt      Potential temperature (ITS-90) referenced to 1 atm   [deg C]
+    slp     Sea level pressure                                   [atm] (default: 1.0)
+
+    OUTPUT:
+    ----------
+    fugfac  Fugacity correction factor for N2O (dimensionless)
+
+    AUTHOR: Colette Kelly
     """
     # Weiss and Price calculation uses R = 0.08205601 L*atm/mol/K
     # define local R here instead of using global R from gasex.phys
@@ -69,18 +73,29 @@ def N2Ofugacity_factor(pt,slp=1.0):
 @match_args_return
 def N2Ofugacity(SP,pt,slp=1.0,xn2o=338e-9,v=32.3,rh=1.0,units = "natm"):
     """
+    DESCRIPTION
+    -------------
     Calculate the fugacity of N2O in seawater.
 
-    Parameters:
-    - SP: Practical Salinity  (PSS-78) (unitless)
-    - pt: potential temperature (ITS-90) referenced
-             to one standard atmosphere (0 dbar).
-    - slp: Sea level pressure (atm) (default: 1.0)
-    - xn2o: Mixing ratio of N2O  in dry air (ppb) (default: 333 ppb)
-    - units: Units of fugacity ("natm" for nanonatmospheres, "atm" for atmospheres) (default: "natm")
+    Fugacity accounts for non-ideal gas behavior and is used in air-sea gas exchange calculations.
+    This function implements the Weiss and Price (1980) method to compute N2O fugacity, incorporating 
+    corrections for seawater vapor pressure and gas non-ideality.
 
-    Returns:
-    - f: Fugacity of N2O in the specified units
+    INPUTS:
+    ----------
+    SP      Practical Salinity (PSS-78) (dimensionless)
+    pt      Potential temperature (ITS-90) referenced to 1 atm   [deg C]
+    slp     Sea level pressure                                   [atm] (default: 1.0)
+    xn2o    Mixing ratio of N2O in dry air                      [mol/mol] (default: 338e-9)
+    v       Partial molar volume of N2O                         [cm³/mol] (default: 32.3)
+    rh      Relative humidity                                    [fraction] (default: 1.0)
+    units   Units of fugacity ("natm" for nanonatmospheres, "atm" for atmospheres) (default: "natm")
+
+    OUTPUT:
+    ----------
+    f       Fugacity of N2O in the specified units
+
+    AUTHOR: Colette Kelly
     """
     # calculate fugacity factor
     fugfac = N2Ofugacity_factor(pt,slp=slp)

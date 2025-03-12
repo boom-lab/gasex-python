@@ -80,6 +80,7 @@ from gasex.phys import kinematic_viscosity_air
 # TODO: find N2O, CO diffusivities
 GAS_LIST = ('HE','NE','AR','KR','XE','N2','O2','CH4','N2','CO2')
 W14_LIST = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
+W92_LIST = ('HE','NE','AR','O2','CH4','CO2','N2','KR','N2O','RN','SF6','CCL2','CCL3')
 
 @match_args_return
 def diff(SP,pt,*,gas=None):
@@ -128,17 +129,33 @@ def diff(SP,pt,*,gas=None):
 @match_args_return
 def schmidt(SP,pt,*,gas=None, schmidt_parameterization=None):
     """
+    DESCRIPTION
+    -------------
     Calculate water-side Schmidt number from salinity and potential temperature.
-    Parameters:
-        SP (array-like): Practical salinity
-        pt (array-like): potential temperature in degrees Celsius
-        gas (string): 'NE', 'CFC11', 'HE', 'CH4', 'SF6', 'XE', 'CCL2', 'CO2', 'CFC12', 'DMS', 'AR', 'RN', 'CCL4', 'KR', 'O2', 'N2', 'CCL3', 'CH3BR', or 'N2O'
-        schmidt_parameterization (string): 'viscdiff', 'W14', or 'W92' (Default: viscdiff if available for that gas,
-        then W14 if visdiff is not available, then W92 if viscdiff and W14 are not available.)
-
-    Returns:
-        schmidt (array-like): water-side Schmidt number (dimensionless)
-    """  
+    
+    Schmidt number (Sc) is a dimensionless number representing the ratio of momentum diffusivity 
+    (kinematic viscosity) to mass diffusivity. It is a key parameter in air-sea gas exchange calculations.
+    
+    INPUTS:
+    ----------
+    SP       Practical salinity                            [dimensionless]
+    pt       Potential temperature                        [deg C]
+    gas      Abbreviation for gas of interest             [string]
+             ('NE', 'CFC11', 'HE', 'CH4', 'SF6', 'XE', 'CCL2', 'CO2', 
+              'CFC12', 'DMS', 'AR', 'RN', 'CCL4', 'KR', 'O2', 'N2', 
+              'CCL3', 'CH3BR', or 'N2O')
+    schmidt_parameterization  Method for Schmidt number calculation [string]
+             ('viscdiff', 'W14', or 'W92')
+             Default: 'viscdiff' if available for that gas,
+                      'W14' if viscdiff is not available,
+                      'W92' if neither viscdiff nor W14 are available.
+    
+    OUTPUT:
+    ----------
+    schmidt  Water-side Schmidt number (dimensionless)
+    
+    AUTHOR: David Nicholson & Colette Kelly
+    """
     GAS_LIST = ('HE','NE','AR','KR','XE','N2','O2','CH4','N2','CO2')
     W14_LIST = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
     W92_LIST = ('HE','NE','AR','O2','CH4','CO2','N2','KR','N2O','RN','SF6','CCL2','CCL3')
@@ -182,19 +199,30 @@ def schmidt(SP,pt,*,gas=None, schmidt_parameterization=None):
 
 @match_args_return
 def schmidt_W14(pt,*,gas=None,sw=True):
-    """Schmidt number @ 35 psu based on Wanninkhof 2014 Table 1
+    """
+    DESCRIPTION
+    -------------
+    Calculate the Schmidt number at 35 PSU or for fresh water based on Wanninkhof 2014 Table 1.
+    
+    Schmidt number (Sc) is a dimensionless quantity representing the ratio of momentum diffusivity 
+    (kinematic viscosity) to mass diffusivity. It is essential in air-sea gas exchange calculations.
 
-    Args:
-        pt ([array like]): potential temperature  [degree C]
-        gas ([string]): abbreviation for gas. Defaults to None.
-        sw (bool, optional): if True, then calculates for SP = 35, of false, 
-            calculates for fresh water. Defaults to True.
-
-    Raises:
-        ValueError: [description]
-
-    Returns:
-        [type]: Schmidt number [dimensionless]
+    INPUTS:
+    ----------
+    pt       Potential temperature                        [deg C]
+    gas      Abbreviation for gas of interest             [string]
+             ('CO2', 'N2O', 'CH4', 'RN', 'SF6', 'DMS', 'CFC12', 
+              'CFC11', 'CH3BR', or 'CCL4')
+    sw       Seawater flag                                [bool]
+             If True, calculates for seawater at SP = 35.
+             If False, calculates for fresh water.
+             Default: True.
+    
+    OUTPUT:
+    ----------
+    schmidt  Water-side Schmidt number (dimensionless)
+    
+    AUTHOR: David Nicholson
     """
     W14_LIST = ('CO2','N2O','CH4','RN','SF6','DMS','CFC12','CFC11','CH3BR','CCL4')
     g_up = gas.upper()
@@ -231,19 +259,29 @@ def schmidt_W14(pt,*,gas=None,sw=True):
 
 @match_args_return
 def schmidt_W92(pt,*,gas=None,sw=True):
-    """Schmidt number @ 35 psu based on Wanninkhof 1992 Table A1
+    """
+    DESCRIPTION
+    -------------
+    Calculate the Schmidt number at 35 PSU or for fresh water based on Wanninkhof 1992 Table A1.
+    
+    Schmidt number (Sc) is a dimensionless quantity representing the ratio of momentum diffusivity 
+    (kinematic viscosity) to mass diffusivity. It is essential in air-sea gas exchange calculations.
 
-    Args:
-        pt ([array like]): potential temperature  [degree C]
-        gas ([string]): abbreviation for gas. Defaults to None.
-        sw (bool, optional): if True, then calculates for SP = 35, of false, 
-            calculates for fresh water. Defaults to True.
-
-    Raises:
-        ValueError: [description]
-
-    Returns:
-        [type]: Schmidt number [dimensionless]
+    INPUTS:
+    ----------
+    pt       Potential temperature                        [deg C]
+    gas      Abbreviation for gas of interest             [string]
+             ('O2', 'N2', 'CO2', 'N2O', 'CH4', 'HE', 'AR', 'KR', 'XE', 'SF6', 'CCL2', 'CCL3', 'CCL4')
+    sw       Seawater flag                                [bool]
+             If True, calculates for seawater at SP = 35.
+             If False, calculates for fresh water.
+             Default: True.
+    
+    OUTPUT:
+    ----------
+    schmidt  Water-side Schmidt number (dimensionless)
+    
+    AUTHOR: David Nicholson
     """
     W92_LIST = ('HE','NE','AR','O2','CH4','CO2','N2','KR','N2O','RN','SF6','CCL2','CCL3')
     if gas is None:
@@ -292,18 +330,31 @@ def schmidt_W92(pt,*,gas=None,sw=True):
 @match_args_return
 def air_side_Schmidt_number(air_temperature, air_density, gas=None, calculate=True):
     """
-    Calculate the air-side Schmidt number for nitrous oxide (N2O).
+    DESCRIPTION
+    -------------
+    Calculate the air-side Schmidt number.
 
-    Parameters:
-        air_temperature (float): Air temperature in degrees Celsius.
-        sea_level_pressure (float): Sea level pressure in atm.
-        rh (float): relative humidity (default: 1)
-        gas: formula for gas (H2O, CO2, CH4, CO, SO2, O3, NH3, or N2O), formatted as a string, e.g. 'He'
-        calculate: if True, calculate Schmidt number from diffusivity and kinematic viscosity of air;
-                   if False, use default value from lookup table
+    The Schmidt number (Sc) is a dimensionless quantity representing the ratio of momentum diffusivity 
+    (kinematic viscosity) to mass diffusivity. It is important for characterizing gas exchange processes 
+    between air and water.
 
-    Returns:
-        float: Air-side Schmidt number for nitrous oxide (N2O).
+    INPUTS:
+    ----------
+    air_temperature  Air temperature                        [deg C]
+    air_density      Air density                            [kg m⁻³]
+    rh              Relative humidity                      [dimensionless]
+                    Default: 1 (100% humidity)
+    gas             Abbreviation for gas of interest       [string]
+                    ('H2O', 'CO2', 'CH4', 'CO', 'SO2', 'O3', 'NH3', or 'N2O')
+    calculate       Schmidt number calculation method      [bool]
+                    If True, calculates from diffusivity and kinematic viscosity of air.
+                    If False, uses default value from a lookup table.
+
+    OUTPUT:
+    ----------
+    schmidt         Air-side Schmidt number (dimensionless)
+
+    AUTHOR: Colette Kelly
     """
     # Coefficients of diffusivity (cm2/s) of selected gases in air, 
     diffusivities = {

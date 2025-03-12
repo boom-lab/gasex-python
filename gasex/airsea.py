@@ -155,82 +155,71 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
         calculate_schmidtair=True, schmidt_parameterization=None, return_vars=None,
         Ks = None, Kb=None, Kc=None, dP=None, beta=1.0, pressure_mode=False):
     """
-    % L13: Function to calculate air-sea fluxes with Liang 2013
-    % parameterization
-    %
-    % USAGE:-------------------------------------------------------------------
-    % [Fd, Fc, Fp, Deq, k] = L13(C,u10,S,T,slp,gas,rh)
-    % [Fd, Fc, Fp, Deq, k] = L13(0.01410,5,35,10,1,'Ar',0.9)
-    %   >Fd = -5.2632e-09
-    %   >Fc = 1.3605e-10
-    %   >Fp = -6.0079e-10
-    %   >Deq = 0.0014
-    %   >k = 2.0374e-05
-    %
-    % DESCRIPTION:-------------------------------------------------------------
-    %
-    % Calculate air-sea fluxes and steady-state supersat based on:
-    % Liang, J.-H., C. Deutsch, J. C. McWilliams, B. Baschek, P. P. Sullivan,
-    % and D. Chiba (2013), Parameterizing bubble-mediated air-sea gas exchange
-    % and its effect on ocean ventilation, Global Biogeochem. Cycles, 27,
-    % 894?905, doi:10.1002/gbc.20080.
-    %
-    % INPUTS:------------------------------------------------------------------
-    % C:    gas concentration (mol m-3) if pressure_mode is False;
-    %       Psw (atm) if pressure_mode is True
-    % u10:  10 m wind speed (m/s)
-    % SP:   Sea surface salinity (PSS)
-    % pt:   Sea surface temperature (deg C)
-    % pslp: sea level pressure (atm)
-    % gas:  formula for gas (He, Ne, Ar, Kr, Xe, N2, or O2), formatted as a
-    %       string, e.g. 'He'
-    % rh:   relative humidity as a fraction of saturation (0.5 = 50% RH)
-    %       rh is an optional but recommended argument. If not provided, it
-    %       will be automatically set to 1 (100% RH).
-    %
-    %       Code    Gas name        Reference
-    %       ----   ----------       -----------
-    %       He      Helium          Weiss 1971
-    %       Ne      Neon            Hamme and Emerson 2004
-    %       Ar      Argon           Hamme and Emerson 2004
-    %       Kr      Krypton         Weiss and Keiser 1978
-    %       Xe      Xenon           Wood and Caputi 1966
-    %       N2      Nitrogen        Hamme and Emerson 2004
-    %       O2      Oxygen          Garcia and Gordon 1992
-    %
-    % OUTPUTS:-----------------------------------------------------------------
-    %
-    % tuple output: (Fd,Fc,Fp,Deq,k)
-    % Fd:   Surface gas flux                              (mol m-2 s-1)
-    % Fc:   Flux from fully collapsing small bubbles      (mol m-2 s-1)
-    % Fp:   Flux from partially collapsing large bubbles  (mol m-2 s-1)
-    % Deq:  Equilibrium supersaturation                   (unitless (%sat/100))
-    % k:    Diffusive gas transfer velocity               (m s-1)
-    %
-    % Note: Total air-sea flux is Ft = Fd + Fc + Fp
-    %
-    % REFERENCE:---------------------------------------------------------------
-    %
-    % Liang, J.-H., C. Deutsch, J. C. McWilliams, B. Baschek, P. P. Sullivan,
-    %   and D. Chiba (2013), Parameterizing bubble-mediated air-sea gas
-    %   exchange and its effect on ocean ventilation, Global Biogeochem. Cycles,
-    %   27, 894?905, doi:10.1002/gbc.20080.
-    %
-    % AUTHOR:---------------------------------------------------------------
-    % Written by David Nicholson dnicholson@whoi.edu
-    % Modified by Cara Manning cmanning@whoi.edu
-    % Woods Hole Oceanographic Institution
-    % Version: 12 April 2017
-    %
-    % COPYRIGHT:---------------------------------------------------------------
-    %
-    % Copyright 2017 David Nicholson and Cara Manning
-    %
-    % Licensed under the Apache License, Version 2.0 (the "License");
-    % you may not use this file except in compliance with the License, which
-    % is available at http://www.apache.org/licenses/LICENSE-2.0
-    %
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    DESCRIPTION
+    -------------
+    Calculate air-sea fluxes and steady-state supersaturation using the Liang et al. (2013) parameterization.
+
+    F = k (C - Ceq_slp)
+
+    INPUTS:
+    ----------
+    C         Surface dissolved gas concentration       [mol m-3 == mmol L-1]
+    u10       10-m wind speed                           [m s-1]
+    SP        Practical Salinity                        --
+    T         Surface water temperature                [deg C]
+    slp       Sea-level pressure                       [atm]
+    gas       Abbreviation for gas of interest         [e.g., 'He', 'Ar', 'N2O']
+    rh        Fractional relative humidity             (1 = 100%)
+    chi_atm   Atmospheric mixing ratio of the gas      [mol/mol]
+    air_temperature  Air temperature                   [deg C] (optional; default air density = 1.225 kg/m³)
+    calculate_schmidtair  Compute air-side Schmidt number (True/False; default = False)
+    schmidt_parameterization  Method for water-side Schmidt number ('viscdiff', 'W14', or 'W92'; default = 'viscdiff')
+    return_vars  Variables to return (default = ('Fd', 'Fc', 'Fp', 'Deq', 'Ks'))
+    Ks        Diffusive gas transfer coefficient       [m s-1] (optional; overrides calculation if provided)
+    Kb        Large bubble transfer velocity           [m s-1] (optional; overrides calculation if provided)
+    Kc        Small bubble transfer velocity           [m s-1] (optional; overrides calculation if provided)
+    dP        Overpressure dependence on windspeed     [%] (optional; overrides calculation if provided)
+    beta      Scaling factor for bubble flux adjustment (default = 1)
+    pressure_mode  If True, C is gas partial pressure in seawater [atm]; otherwise, C is concentration [mol m-3]
+
+    OUTPUTS:
+    ----------
+    Fd        Surface gas flux                         [mol m-2 s-1]
+    Fc        Flux from fully collapsing small bubbles [mol m-2 s-1]
+    Fp        Flux from partially collapsing large bubbles [mol m-2 s-1]
+    Deq       Equilibrium supersaturation             [unitless (%sat/100)]
+    Ks        Diffusive gas transfer velocity         [m s-1]
+    Kb        Large bubble transfer velocity          [m s-1]
+    Kc        Small bubble transfer velocity          [m s-1]
+    dP        Overpressure dependence on windspeed    [%]
+    ScW       Water-side Schmidt number               [dimensionless]
+    Geq       Equilibrium concentration at 1 atm      [mmol L-1]
+    ustarw    Friction velocity                       [m s-1]
+    rwt       Water-side resistance to transfer       [dimensionless]
+    rat       Air-side resistance to transfer         [dimensionless]
+
+    Note: Total air-sea flux is Ft = Fd + Fc + Fp
+
+    REFERENCE:
+    -------------
+    Liang, J.-H., C. Deutsch, J. C. McWilliams, B. Baschek, P. P. Sullivan, and D. Chiba (2013), Parameterizing bubble-mediated air-sea gas exchange and its effect on ocean ventilation, Global Biogeochem. Cycles, 27, 894–905, doi:10.1002/gbc.20080.
+
+    AUTHOR:
+    -------------
+    Written by David Nicholson
+    dnicholson@whoi.edu
+    Modified by Cara Manning
+    cmanning@whoi.edu
+    Modified by Colette Kelly
+    colette.kelly@whoi.edu
+    Woods Hole Oceanographic Institution
+    Version: 12 March 2025
+
+    COPYRIGHT:
+    -------------
+    Copyright 2017 David Nicholson and Cara Manning
+    Licensed under the Apache License, Version 2.0
+    http://www.apache.org/licenses/LICENSE-2.0
     """
     # -------------------------------------------------------------------------
     # Conversion factors
@@ -286,7 +275,7 @@ def L13(C,u10,SP,pt,*,slp=1.0,gas=None,rh=1.0,chi_atm=None, air_temperature=None
     # -------------------------------------------------------------------------
     if chi_atm is None:
         xG = air_mol_fract(gas=gas)
-        f  = fugacity_factor(pt,gas=gas,slp=slp)
+        f  = fugacity_factor(pt,gas=gas,slp=slp) # calculate f here s.t. eq_SP_pt can be referenced to 1 atm
         s = sol_SP_pt(SP,pt,chi_atm=xG, gas=gas,units="mM")
         Geq = f * eq_SP_pt(SP,pt,slp = 1.0,gas=gas,units="mM") # referenced to 1 atm, we apply pressure correction later
         Patm = Geq / s
