@@ -27,25 +27,29 @@ def match_args_return(f):
     """
     @wraps(f)
     def wrapper(*args, **kw):
+        # if if exists, the 'p' keyword argument is treated as a special case
         p = kw.get('p', None)
         if p is not None:
             args = list(args)
             args.append(p)
 
-        isarray = [hasattr(a, '__iter__') for a in args]
-        ismasked = [np.ma.isMaskedArray(a) for a in args]
-        isduck = [hasattr(a, '__array_ufunc__')
+        isarray = [hasattr(a, '__iter__') for a in args] # Check if arguments are array-like
+        ismasked = [np.ma.isMaskedArray(a) for a in args] # Check if arguments are masked arrays
+        isduck = [hasattr(a, '__array_ufunc__') # Check if arguments are duck arrays
                     and not isinstance(a, np.ndarray) for a in args]
 
-        hasarray = np.any(isarray)
-        hasmasked = np.any(ismasked)
-        hasduck = np.any(isduck)
+        hasarray = np.any(isarray) # Check if there is at least one array-like argument
+        hasmasked = np.any(ismasked) # Check if there is at least one masked array argument
+        hasduck = np.any(isduck) # Check if there is at least one duck array argument
 
         def fixup(ret):
+            # If function returns a duck array, return it as is
             if hasduck:
                 return ret
+            # If function returns a masked array, convert invalid values to masked
             if hasmasked:
                 ret = np.ma.masked_invalid(ret)
+            # If function returns a single value array, return the value instead
             if not hasarray and isinstance(ret, np.ndarray) and ret.size == 1:
                 try:
                     ret = ret[0]
@@ -53,6 +57,7 @@ def match_args_return(f):
                     pass
             return ret
 
+        # Convert arguments to appropriate format
         newargs = []
         for i, arg in enumerate(args):
             if ismasked[i]:
@@ -62,17 +67,21 @@ def match_args_return(f):
             else:
                 newargs.append(np.asarray(arg, dtype=float))
 
+        # If 'p' exists, remove it from keyword arguments
         if p is not None:
             kw['p'] = newargs.pop()
 
+        # Call the function with the new arguments
         ret = f(*newargs, **kw)
 
+        # Fix up the return value
         if isinstance(ret, tuple):
             retlist = [fixup(arg) for arg in ret]
             ret = tuple(retlist)
         else:
             ret = fixup(ret)
         return ret
+    # Preserve the original function
     wrapper.__wrapped__ = f
     return wrapper
 

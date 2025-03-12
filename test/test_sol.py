@@ -115,8 +115,6 @@ class TestCheckVals(unittest.TestCase):
             fw_result = diff.schmidt_W14(20,gas=gas,sw=False)
             self.assertTrue(round(sw_result)==sc_check_sw[gas])
             self.assertTrue(round(fw_result)==sc_check_fw[gas])
-    
-
 
 if __name__ == '__main__':
     unittest.main()
