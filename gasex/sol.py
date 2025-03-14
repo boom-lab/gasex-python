@@ -712,6 +712,7 @@ def N2Osol_SP_pt(SP,pt):
      OUTPUT:
       N2Osol = K' solubility of nitrous oxide                 mol L-1 atm-1 ]
               (solubility in moist air at total pressure of 1 atm)
+              coefficients are also included for output in mol kg-1 atm-1
 
      AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
                                                           [ help@teos-10.org ]
@@ -742,19 +743,14 @@ def N2Osol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # The coefficents below are from Table 2 of Weiss and Price (1980)
+    
     # These coefficients are for mol L-1 atm-1
-
-
     a = (-62.7062, 97.3066, 24.1406)
     b = (-0.058420, 0.033193, -0.0051313)
 
-    #a = [-165.8806, 222.8743, 92.0792, -1.48425]
-    #b = [-0.056235, 0.031619, -0.0048472]
-
-    # These coefficents below are from Table 2 of Weiss and Price (1980)
     # These coefficients are for mol kg-1 atm-1
-    # a = [-168.2459, 226.0894, 93.2817, -1.48693]
-    # b = [-0.060361 + 0.033765, -0.0051862]
+    # a = (-64.8539, 100.2520, 25.2049)
+    # b = (-0.062544, 0.035337, -0.0054699)
 
     # Moist air correction at 1 atm.
     # fitted the vapor pressure of water as given by Goff and Gratch (1946),
