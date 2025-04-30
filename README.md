@@ -11,7 +11,7 @@ functions are available for either absolute  salinity (SA) and conservative temp
 
 gasex-python is under active development and there is not an official release available yet.  To work with the latest version you should be able to pip install . after cloning the repository:
 
-> git clone https://github.com/dnicholson/gasex-python .
+> git clone https://github.com/boom-lab/gasex-python .
 
 >pip install .
 
