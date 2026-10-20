@@ -50,7 +50,7 @@ def N2Ofugacity_factor(pt,slp=1.0):
     # define local R here instead of using global R from gasex.phys
     R = 0.08205601
 
-    # Weiss and Price: partial molal volume of N2O is 32.2 cm3/mol
+    # Weiss and Price: partial molal volume of N2O is 32.3 cm3/mol
     v=32.3
     # need to convert from cm3 to L for exponential term 2 to be dimensionless
     v = v/1000
@@ -71,7 +71,7 @@ def N2Ofugacity_factor(pt,slp=1.0):
     return fugfac
 
 @match_args_return
-def N2Ofugacity(SP,pt,slp=1.0,xn2o=338e-9,v=32.3,rh=1.0,units = "natm"):
+def N2Ofugacity(SP,pt,slp=1.0,xn2o=338e-9,rh=1.0,units = "natm"):
     """
     DESCRIPTION
     -------------
@@ -87,7 +87,6 @@ def N2Ofugacity(SP,pt,slp=1.0,xn2o=338e-9,v=32.3,rh=1.0,units = "natm"):
     pt      Potential temperature (ITS-90) referenced to 1 atm   [deg C]
     slp     Sea level pressure                                   [atm] (default: 1.0)
     xn2o    Mixing ratio of N2O in dry air                      [mol/mol] (default: 338e-9)
-    v       Partial molar volume of N2O                         [cm³/mol] (default: 32.3)
     rh      Relative humidity                                    [fraction] (default: 1.0)
     units   Units of fugacity ("natm" for nanonatmospheres, "atm" for atmospheres) (default: "natm")
 
