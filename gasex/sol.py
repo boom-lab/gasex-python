@@ -686,21 +686,64 @@ def N2sol(SA,CT,p,long,lat):
 @match_args_return
 def N2Osol_SP_pt(SP,pt):
     """
-     gsw_N2Osol_SP_pt                            solubility of N2O in seawater
+     N2Osol_SP_pt          solubility coefficient (K0) of N2O in seawater
     ==========================================================================
 
      USAGE:
-      N2Osol = gsw_N2Osol_SP_pt(SP,pt)
+      K0 = N2Osol_SP_pt(SP,pt)
 
      DESCRIPTION:
-      Calculates the nitrous oxide, N2O, concentration expected at equilibrium
-      with air at an Absolute Pressure of 101325 Pa (sea pressure of 0 dbar)
-      including saturated water vapor  This function uses the solubility
-      coefficients as listed in Hamme and Emerson (2004).
+      Calculates the Henry's-law solubility coefficient, K0, of nitrous oxide
+      in seawater, using the K0 coefficients (volumetric units) from Table 2
+      of Weiss and Price (1980).
 
-      Note that this algorithm has not been approved by IOC and is not work
-      from SCOR/IAPSO Working Group 127. It is included in the GSW
-      Oceanographic Toolbox as it seems to be oceanographic best practice.
+      K0 is NOT an equilibrium concentration and does NOT include the
+      water-vapor or gas non-ideality corrections. It relates the dissolved
+      concentration to the fugacity of N2O in the gas phase:
+
+          C = K0 * f
+
+      where the fugacity in moist air at total pressure P is
+
+          f = x' * (P - pH2O) * fugfac
+
+          x'      dry-air mole fraction of N2O                   [ mol mol-1 ]
+          P       total (sea level) pressure                           [ atm ]
+          pH2O    water vapor pressure at the sea surface              [ atm ]
+          fugfac  N2O fugacity correction factor (non-ideality)   [ unitless ]
+
+      f can be computed directly with gasex.fugacity.N2Ofugacity (use
+      units="atm"), or assembled from gasex.phys.vpress_sw and
+      gasex.fugacity.N2Ofugacity_factor. For slp != 1 atm, N2Ofugacity_factor
+      also includes the small pressure (Poynting) correction to K0.
+
+      Multiplying K0 by x' alone omits the (1 - pH2O) and fugacity
+      corrections, which overestimates the equilibrium concentration by
+      ~1% at 0 deg C and ~4% at 28 deg C.
+
+      The result is per volume of seawater (mol L-1). To convert to
+      mol kg-1, divide the concentration by seawater density in kg L-1
+      (as gasex.sol.eq_SP_pt does). The per-mass K0 coefficients from
+      Weiss and Price (1980) are included below, commented out, as an
+      alternative.
+
+      Weiss and Price (1980) predate ITS-90, so pt is converted to IPTS-68
+      (pt68 = 1.00024 * pt) before the coefficients are evaluated.
+
+      Example (equilibrium concentration at 1 atm, 100% humidity):
+
+          from gasex.sol import N2Osol_SP_pt
+          from gasex.fugacity import N2Ofugacity
+
+          K0 = N2Osol_SP_pt(SP, pt)                       # mol L-1 atm-1
+          f  = N2Ofugacity(SP, pt, slp=1.0, xn2o=335e-9,
+                           units="atm")                   # atm
+          C  = K0 * f                                     # mol L-1
+
+      For an equilibrium concentration directly, see gasex.sol.eq_SP_pt
+      (gas='N2O'), which applies the (1 - pH2O) term; it does not apply
+      the fugacity factor, so multiply its output by
+      gasex.fugacity.fugacity_factor(pt, gas='N2O', slp=slp).
 
      INPUT:
       SP  =  Practical Salinity  (PSS-78)                         [ unitless ]
@@ -710,26 +753,14 @@ def N2Osol_SP_pt(SP,pt):
       SP & pt need to have the same dimensions.
 
      OUTPUT:
-      N2Osol = K' solubility of nitrous oxide                 mol L-1 atm-1 ]
-              (solubility in moist air at total pressure of 1 atm)
-              coefficients are also included for output in mol kg-1 atm-1
-
-     AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
-                                                          [ help@teos-10.org ]
-
-     VERSION NUMBER: 3.05 (27th January 2015)
+      K0  =  solubility coefficient of N2O                [ mol L-1 atm-1 ]
+             (Henry's-law constant; multiply by fugacity in atm
+             to obtain concentration in mol L-1)
 
      REFERENCES:
-      IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of
-       seawater - 2010: Calculation and use of thermodynamic properties.
-       Intergovernmental Oceanographic Commission, Manuals and Guides No. 56,
-       UNESCO (English), 196 pp.  Available from http://www.TEOS-10.org
-
       Weiss, R.F. and B.A. Price, 1980: Nitrous oxide solubility in water and
        seawater. Mar. Chem., 8, 347-359.
        https://doi.org/10.1016/0304-4203(80)90024-9
-
-      The software is available from http://www.TEOS-10.org
 
     ==========================================================================
     """
