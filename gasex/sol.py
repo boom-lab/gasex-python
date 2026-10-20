@@ -79,9 +79,9 @@ def eq_SP_pt(SP,pt,*,gas=None,slp=1.0,units="mM",chi_atm=None):
     elif gas == 'N2':
         soleq = N2sol_SP_pt(SP,pt)
     elif gas == 'N2O':
-        k = N2Osol_SP_pt(SP,pt)
-        soleq = k*chi_atm*(1 - vp_sw) # mol/L
-        soleq = soleq/dens*1000*1e6 # convert to umol/kg
+        k = N2Osol_SP_pt(SP,pt,units="gravimetric") # mol kg-1 atm-1
+        soleq = k*chi_atm*(1 - vp_sw) # mol/kg
+        soleq = soleq*1e6 # convert to umol/kg
     elif gas == 'CO2':
         k = CO2sol_SP_pt(SP,pt)
         soleq = k*chi_atm*(1 - vp_sw) # mol/L
@@ -140,10 +140,14 @@ def sol_SP_pt(SP,pt,*,gas=None,p_dry=1.0,slp=1.0,rh=1.0,chi_atm=None,units="mM")
     elif units =="mM" or units == "molm3":
         return K0 * 1e3
     elif units == 'umolkg':
+        if gas == 'N2O':
+            # use the gravimetric K0 from Weiss and Price (1980) directly
+            return 1e6 * N2Osol_SP_pt(SP,pt,units="gravimetric") # umol kg-1 atm-1
         SA = SP * 35.16504/35
         CT = CT_from_pt(SA,pt)
-        dens = rho(SA,CT,0*CT)
-        return 1e-3 * K0 / dens
+        dens = rho(SA,CT,0*CT) # kg m-3
+        # mol L-1 atm-1 -> umol kg-1 atm-1: x 1e6 umol/mol, / (dens/1000) kg/L
+        return 1e9 * K0 / dens
     else:
         raise ValueError("units: units must be \'M\', \'mM\',\'molm3\' or \'umolkg\'")
 
@@ -727,9 +731,8 @@ def N2Osol_SP_pt(SP,pt,*,units="volumetric"):
       With units="volumetric" (default), K0 refers to a liter of solution
       and concentrations come out in mol L-1. With units="gravimetric", K0
       refers to a kilogram of solution and concentrations come out in
-      mol kg-1, so no density conversion is needed. Note that
-      gasex.sol.eq_SP_pt uses the volumetric K0 and converts with seawater
-      density.
+      mol kg-1, so no density conversion is needed. gasex.sol.eq_SP_pt
+      uses the gravimetric K0.
 
       Weiss and Price (1980) predate ITS-90, so pt is converted to IPTS-68
       (pt68 = 1.00024 * pt) before the coefficients are evaluated.
