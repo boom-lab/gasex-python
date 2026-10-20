@@ -30,10 +30,20 @@ def N2Ofugacity_factor(pt,slp=1.0):
     """
     DESCRIPTION
     -------------
-    Calculate the fugacity of N2O in seawater.
+    Calculate the combined fugacity correction factor for N2O.
 
-    Fugacity accounts for non-ideal gas behavior and is used in air-sea gas exchange calculations.
-    This function implements the Weiss and Price (1980) method for computing the fugacity correction factor.
+    Returns the exponential term of Weiss and Price (1980), eq. (9):
+
+        F = K0 * (P - pH2O) * exp[ P*(B + 2*delta)/(R*T) + v*(1 - P)/(R*T) ]
+
+    i.e. fugfac = exp[ P*(B + 2*delta)/(R*T) + v*(1 - P)/(R*T) ], which
+    combines the gas non-ideality of N2O in air (first term; (B + 2*delta)/RT
+    from eq. (11)) with the pressure dependence of K0 via the partial molal
+    volume v (second term; eq. (1)). The second term is zero at P = 1 atm.
+
+    K0 * x' * (P - pH2O) * fugfac is therefore the equilibrium concentration
+    at total pressure P, where K0 is from gasex.sol.N2Osol_SP_pt and x' is
+    the dry-air mole fraction of N2O.
 
     INPUTS:
     ----------
@@ -42,7 +52,8 @@ def N2Ofugacity_factor(pt,slp=1.0):
 
     OUTPUT:
     ----------
-    fugfac  Fugacity correction factor for N2O (dimensionless)
+    fugfac  Combined fugacity correction factor for N2O, Weiss and Price
+            (1980) eq. (9) (dimensionless)
 
     AUTHOR: Colette Kelly
     """
@@ -59,13 +70,13 @@ def N2Ofugacity_factor(pt,slp=1.0):
     pt68 = pt * 1.00024
     y = pt68 + K0 # K0 is 0 Celsius in Kelvin, imported from phys.py
 
-    # Calculate exponential term 1 (Weiss and Price )1980, eqn. (11))
+    # Calculate exponential term 1: P*(B + 2*delta)/RT (Weiss and Price 1980, eqns. (9) and (11))
     eterm1 = slp*(-9.4563/y + 0.04739 - 6.427*10**-5*y)
     
-    # Calculate exponential term 2 (Weiss and Price 1980, eqn. (1))
+    # Calculate exponential term 2: v*(1 - P)/RT (Weiss and Price 1980, eqns. (1) and (9))
     eterm2 = (1-slp)*v/(R*y)
     
-    # fugacity, Weiss and Price 1980, eqn. (7)
+    # combined fugacity correction factor, Weiss and Price 1980, eqn. (9)
     fugfac = np.exp(eterm1+eterm2)
 
     return fugfac
@@ -105,7 +116,9 @@ def N2Ofugacity(SP,pt,slp=1.0,xn2o=338e-9,rh=1.0,units = "natm"):
     # Calculate the vapor pressure of water
     vp_sw = vpress_sw(SP,pt)*rh # vapor pressure of water
     
-    # fugacity, Weiss and Price 1980, eqn. (7)
+    # fugacity, Weiss and Price 1980: eqn. (7) at slp = 1 atm; for slp != 1 atm,
+    # fugfac also carries the v*(1 - P)/RT term, so f = F/K0 from eqn. (9)
+    # (i.e. K0 * f is the equilibrium concentration)
     f = xn2o*(slp-vp_sw)*fugfac
     
     # Convert to atmospheres if specified

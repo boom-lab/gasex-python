@@ -684,18 +684,19 @@ def N2sol(SA,CT,p,long,lat):
     return N2sol_SP_pt(SP,pt)
 
 @match_args_return
-def N2Osol_SP_pt(SP,pt):
+def N2Osol_SP_pt(SP,pt,*,units="volumetric"):
     """
      N2Osol_SP_pt          solubility coefficient (K0) of N2O in seawater
     ==========================================================================
 
      USAGE:
-      K0 = N2Osol_SP_pt(SP,pt)
+      K0 = N2Osol_SP_pt(SP,pt)                       # mol L-1 atm-1
+      K0 = N2Osol_SP_pt(SP,pt,units="gravimetric")   # mol kg-1 atm-1
 
      DESCRIPTION:
       Calculates the Henry's-law solubility coefficient, K0, of nitrous oxide
-      in seawater, using the K0 coefficients (volumetric units) from Table 2
-      of Weiss and Price (1980).
+      in seawater, using the K0 coefficients from Table 2 of Weiss and Price
+      (1980), in either volumetric (default) or gravimetric units.
 
       K0 is NOT an equilibrium concentration and does NOT include the
       water-vapor or gas non-ideality corrections. It relates the dissolved
@@ -710,22 +711,25 @@ def N2Osol_SP_pt(SP,pt):
           x'      dry-air mole fraction of N2O                   [ mol mol-1 ]
           P       total (sea level) pressure                           [ atm ]
           pH2O    water vapor pressure at the sea surface              [ atm ]
-          fugfac  N2O fugacity correction factor (non-ideality)   [ unitless ]
+          fugfac  combined N2O fugacity correction factor         [ unitless ]
 
       f can be computed directly with gasex.fugacity.N2Ofugacity (use
       units="atm"), or assembled from gasex.phys.vpress_sw and
-      gasex.fugacity.N2Ofugacity_factor. For slp != 1 atm, N2Ofugacity_factor
-      also includes the small pressure (Poynting) correction to K0.
+      gasex.fugacity.N2Ofugacity_factor. N2Ofugacity_factor returns the
+      combined correction of Weiss and Price (1980, eq. 9), so
+      K0 * x' * (P - pH2O) * fugfac is the equilibrium concentration at
+      total pressure P.
 
       Multiplying K0 by x' alone omits the (1 - pH2O) and fugacity
       corrections, which overestimates the equilibrium concentration by
       ~1% at 0 deg C and ~4% at 28 deg C.
 
-      The result is per volume of seawater (mol L-1). To convert to
-      mol kg-1, divide the concentration by seawater density in kg L-1
-      (as gasex.sol.eq_SP_pt does). The per-mass K0 coefficients from
-      Weiss and Price (1980) are included below, commented out, as an
-      alternative.
+      With units="volumetric" (default), K0 refers to a liter of solution
+      and concentrations come out in mol L-1. With units="gravimetric", K0
+      refers to a kilogram of solution and concentrations come out in
+      mol kg-1, so no density conversion is needed. Note that
+      gasex.sol.eq_SP_pt uses the volumetric K0 and converts with seawater
+      density.
 
       Weiss and Price (1980) predate ITS-90, so pt is converted to IPTS-68
       (pt68 = 1.00024 * pt) before the coefficients are evaluated.
@@ -752,10 +756,14 @@ def N2Osol_SP_pt(SP,pt):
 
       SP & pt need to have the same dimensions.
 
+     OPTIONAL (keyword-only):
+      units = "volumetric" (default)  ->  K0 in mol L-1 atm-1
+              "gravimetric"           ->  K0 in mol kg-1 atm-1
+
      OUTPUT:
-      K0  =  solubility coefficient of N2O                [ mol L-1 atm-1 ]
+      K0  =  solubility coefficient of N2O     [ mol L-1 atm-1 or mol kg-1 atm-1 ]
              (Henry's-law constant; multiply by fugacity in atm
-             to obtain concentration in mol L-1)
+             to obtain concentration in mol L-1 or mol kg-1)
 
      REFERENCES:
       Weiss, R.F. and B.A. Price, 1980: Nitrous oxide solubility in water and
@@ -774,14 +782,18 @@ def N2Osol_SP_pt(SP,pt):
     y_100 = y * 1e-2
 
     # The coefficents below are from Table 2 of Weiss and Price (1980)
-    
-    # These coefficients are for mol L-1 atm-1
-    a = (-62.7062, 97.3066, 24.1406)
-    b = (-0.058420, 0.033193, -0.0051313)
-
-    # These coefficients are for mol kg-1 atm-1
-    # a = (-64.8539, 100.2520, 25.2049)
-    # b = (-0.062544, 0.035337, -0.0054699)
+    u = units.lower()
+    if u == "volumetric":
+        # These coefficients are for mol L-1 atm-1
+        a = (-62.7062, 97.3066, 24.1406)
+        b = (-0.058420, 0.033193, -0.0051313)
+    elif u == "gravimetric":
+        # These coefficients are for mol kg-1 atm-1
+        a = (-64.8539, 100.2520, 25.2049)
+        b = (-0.062544, 0.035337, -0.0054699)
+    else:
+        raise ValueError("units must be 'volumetric' (mol L-1 atm-1) or "
+                         "'gravimetric' (mol kg-1 atm-1), not " + repr(units))
 
     # Moist air correction at 1 atm.
     # fitted the vapor pressure of water as given by Goff and Gratch (1946),
